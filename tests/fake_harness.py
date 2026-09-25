@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fake harness for exuvia T1 constitution tests: answers probes deterministically.
+"""Fake harness for hiviz T1 constitution tests: answers probes deterministically.
 
 Usage: fake_harness.py "<ask>"   (models the harness CLI contract: {ask} -> stdout)
 

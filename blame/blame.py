@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""exuvia blame — provenance for standing-instruction lines.
+"""hiviz blame — provenance for standing-instruction lines.
 
 Answers: when was this line written, by which model, in which session, why
 (ledger), and is it still verified (constitution). Sources, in order of trust:
-  1. .exuvia/ledger.jsonl  — entries written by exuvia ingest/apply
+  1. .hiviz/ledger.jsonl — entries written by hiviz ingest/apply (.exuvia/ledger.jsonl is read as legacy fallback)
   2. harness session logs  — mined edit/write tool calls (omp: ~/.omp/agent/sessions)
 
 Stdlib only. Read-only.
@@ -112,7 +112,7 @@ def verified_from(constitution_json: Path | None, marker: str) -> list[dict]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="exuvia blame")
+    ap = argparse.ArgumentParser(description="hiviz blame")
     ap.add_argument("--file", required=True)
     ap.add_argument("--line", type=int, default=None)
     ap.add_argument("--marker", default=None, help="text fragment identifying the line")
@@ -147,7 +147,7 @@ def main() -> int:
             print(f"  ledger:    {e.get('written_at', '?')} · {e.get('model', '?')} · "
                   f"reason: {e.get('reason', '?')} · action: {e.get('action', '?')}")
     else:
-        print("  ledger:    (no entry — pre-exuvia history only)")
+        print("  ledger:    (no entry — pre-tool history only)")
     if events:
         print(f"  history:   {len(events)} edit/write event(s) in session logs")
         for e in events[-5:]:

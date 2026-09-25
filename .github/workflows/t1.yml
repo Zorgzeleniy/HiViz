@@ -20,7 +20,7 @@ jobs:
         run: mkdir -p ~/.claude ~/.omp/agent/skills
       - name: node syntax + T-key parity
         run: |
-          node --check bin/exuvia.js
+          node --check bin/hiviz.js
           python tests/parity.py
       - name: deterministic test rig (T1)
         run: python tests/run.py --t1

@@ -1,19 +1,19 @@
-# Exuvia Drift Procedure
+# HiViz Drift Procedure
 
 Drift = standing instructions that no longer match the environment. This
 procedure is deterministic-first: the machine judges, the model only drafts.
 
 ## 1. Run the registry
 ```
-python <exuvia>/drift/check.py --facts .exuvia/facts.toml --base <repo-or-profile-root>
+python <hiviz>/drift/check.py --facts .hiviz/facts.toml --base <repo-or-profile-root>
 ```
 
-`<exuvia>` = the repo checkout or the installed engines dir (`~/.exuvia/engines`).
+`<hiviz>` = the repo checkout or the installed engines dir (`~/.hiviz/engines`).
 
 Statuses: `OK` (fact holds) · `STALE` (fact contradicts the environment — this
 is prompt debt) · `UNVERIFIABLE` (no check defined) · `ERROR` (checker broke).
 
-MCP pay-vs-use is picked up automatically: if `<base>/.exuvia/mcp_footprint.json` exists (written by meters during audit, or manually), every server becomes a fact — `mcp:<server>` — STALE when its standing token cost meets no usage (0 calls, or last used older than `--mcp-stale-days`, default 30; threshold `--mcp-min-tokens`, default 500).
+MCP pay-vs-use is picked up automatically: if `<base>/.hiviz/mcp_footprint.json` exists (written by meters during audit, or manually), every server becomes a fact — `mcp:<server>` — STALE when its standing token cost meets no usage (0 calls, or last used older than `--mcp-stale-days`, default 30; threshold `--mcp-min-tokens`, default 500).
 
 ## 2. Read the STALE table, propose resolutions
 
@@ -25,13 +25,13 @@ corpus for the fact's keywords), and write the contradiction explicitly:
 
 Propose ONE of: update the instruction line · delete it · update the fact
 checker (if the environment, not the instruction, is the anomaly). **Do not
-apply anything** — output the table plus proposals to `.exuvia/drift-report.md`.
+apply anything** — output the table plus proposals to `.hiviz/drift-report.md`.
 
 ## 3. Draft facts for UNVERIFIABLE assumptions (ingest)
 
 Scan instruction surfaces for environment assumptions that have no registry
 entry (paths, versions, ports, installed tools, host addresses). For each,
-append a draft to `.exuvia/facts.toml`:
+append a draft to `.hiviz/facts.toml`:
 
 ```toml
 [facts.<kebab-id>]

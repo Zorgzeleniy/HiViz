@@ -1,13 +1,13 @@
 # Bench — the popular A/B benchmark ("shed bench")
 
-**Question it answers:** take a real popular agent config (a few dozen skills + a real AGENTS.md/CLAUDE.md); run the same deterministic tasks before and after an exuvia cleanup — what happens to tokens, time, and quality?
+**Question it answers:** take a real popular agent config (a few dozen skills + a real AGENTS.md/CLAUDE.md); run the same deterministic tasks before and after a hiviz cleanup — what happens to tokens, time, and quality?
 
 ## Protocol
 
 ```
 for config C (real, permissive-license, popular):
     arm A = C as-is            (frozen copy)
-    arm B = C after ONE exuvia audit+apply (diff frozen once, reused forever)
+    arm B = C after ONE hiviz audit+apply (diff frozen once, reused forever)
     for task T in 4 deterministic tasks:
         N repeats × both arms, cold sessions, one model, one harness
         metrics: tokens_in (fresh input + cache reads) · tokens_out · wall_clock · turns · pass/fail

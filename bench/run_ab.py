@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""exuvia shed-bench runner v2: A/B on deterministic tasks with real token metrics.
+"""hiviz shed-bench runner v2: A/B on deterministic tasks with real token metrics.
 
 Uses `omp --mode=json` to capture provider-reported usage (input/output tokens,
 cache reads, cost) per run. Deterministic verifiers, no LLM judges.
@@ -171,7 +171,7 @@ def render_results(agg: list[dict], raw: list[dict]) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="exuvia shed-bench v2")
+    ap = argparse.ArgumentParser(description="hiviz shed-bench v2")
     ap.add_argument("--arm-a", required=True)
     ap.add_argument("--arm-b", default=None)
     ap.add_argument("--repeats", type=int, default=5)

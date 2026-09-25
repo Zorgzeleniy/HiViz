@@ -1,4 +1,4 @@
-# Exuvia Translate Procedure
+# HiViz Translate Procedure
 
 Migrate a standing-instruction corpus between harnesses (omp ↔ Claude Code ↔
 Codex ↔ Cursor) without losing rules — equivalence is PROVEN by probes, not
@@ -7,7 +7,7 @@ promised.
 ## 1. Harvest the source corpus
 
 Run the audit procedure's Phase 0–2 over the SOURCE surfaces (do not modify
-anything). From the report, author an IR file `.exuvia/ir.jsonl` — one entry
+anything). From the report, author an IR file `.hiviz/ir.jsonl` — one entry
 per surviving line:
 
 ```json
@@ -24,17 +24,17 @@ per surviving line:
 ## 2. Emit mechanically
 
 ```
-python <exuvia>/translate/emit.py --ir .exuvia/ir.jsonl --target <omp|claude|codex|cursor> --out <dir>
+python <hiviz>/translate/emit.py --ir .hiviz/ir.jsonl --target <omp|claude|codex|cursor> --out <dir>
 ```
 
 Divergence check (CI-friendly — verifies the live target files still match the
 mechanical emission from the IR; exit 1 on drift, names the lost rule ids):
 
 ```
-python <exuvia>/translate/emit.py --ir .exuvia/ir.jsonl --target <t> --out <live-dir> --check
+python <hiviz>/translate/emit.py --ir .hiviz/ir.jsonl --target <t> --out <live-dir> --check
 ```
 
-`<exuvia>` = repo checkout or `~/.exuvia/engines`. Placement: omp → safety to
+`<hiviz>` = repo checkout or `~/.hiviz/engines`. Placement: omp → safety to
 `RULES.md`, the rest to `AGENTS.md`; claude → `CLAUDE.md`; codex → `AGENTS.md`;
 cursor → `.cursorrules` (safety section first everywhere). A
 `translation-report.md` records what moved and what was deduplicated.
@@ -45,7 +45,7 @@ Run the constitution suite on the TARGET side with the migrated corpus active
 (fresh sandbox profile / project dir):
 
 ```
-python <exuvia>/constitution/run.py --tests .exuvia/tests --harness "<target harness> -p \"{ask}\"" --corpus <migrated dir>
+python <hiviz>/constitution/run.py --tests .hiviz/tests --harness "<target harness> -p \"{ask}\"" --corpus <migrated dir>
 ```
 
 Every test that passed on the source side must pass on the target side. A test

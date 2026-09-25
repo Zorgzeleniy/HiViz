@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""exuvia translator emit — mechanical placement of an instruction IR.
+"""hiviz translator emit — mechanical placement of an instruction IR.
 
 Input: IR jsonl, one entry per line:
   {"id": "r1", "text": "- ...", "kind": "safety|invariant|rule|fact",
@@ -65,7 +65,7 @@ def render_target(kept: list[dict], target: str, name: str) -> dict[str, str]:
             sections.append(f"## {KIND_HEADERS[kind]}\n\n{body}\n\n<!-- sources: {srcs} -->")
         if not sections:
             continue
-        files[fname] = f"# {name} — translated from source corpus (exuvia)\n\n" + "\n\n".join(sections)
+        files[fname] = f"# {name} — translated from source corpus (hiviz)\n\n" + "\n\n".join(sections)
     return files
 
 
@@ -114,7 +114,7 @@ def report(kept: list[dict], dropped: list[dict], target: str, out: Path) -> Non
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="exuvia translator emit")
+    ap = argparse.ArgumentParser(description="hiviz translator emit")
     ap.add_argument("--ir", required=True)
     ap.add_argument("--target", required=True, choices=sorted(TARGETS))
     ap.add_argument("--out", required=True)

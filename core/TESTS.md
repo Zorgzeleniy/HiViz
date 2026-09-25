@@ -1,14 +1,14 @@
-# Exuvia Constitution Tests Procedure
+# HiViz Constitution Tests Procedure
 
 Constitution tests are probe tests for standing instructions: they prove a
 rule is LIVE in a fresh session, not just present in a file.
 
 ## 1. Run the suite
 ```
-python <exuvia>/constitution/run.py --tests .exuvia/tests --corpus <repo-or-profile-root> [--out .exuvia/constitution.json]
+python <hiviz>/constitution/run.py --tests .hiviz/tests --corpus <repo-or-profile-root> [--out .hiviz/constitution.json]
 ```
 
-`<exuvia>` = the repo checkout or the installed engines dir (`~/.exuvia/engines`).
+`<hiviz>` = the repo checkout or the installed engines dir (`~/.hiviz/engines`).
 
 Verdicts: `PASS` · `FAIL` (markers absent from the answer — the rule stopped
 binding) · `FLAKY` (failed once, passed on retry — reported, does not fail CI)
@@ -20,7 +20,7 @@ Exit code: 0 all green · 1 any FAIL/ERROR. Each probe = one model call (+1 on r
 ## 2. Author tests from decisions
 
 Whenever an audit decision KEEPS or REWRITES a load-bearing rule, write a test
-for it in `.exuvia/tests/<id>.toml`:
+for it in `.hiviz/tests/<id>.toml`:
 
 ```toml
 id = "my-rule"

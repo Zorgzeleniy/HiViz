@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fake MCP stdio server for exuvia tests: N tools with generated descriptions.
+"""Fake MCP stdio server for hiviz tests: N tools with generated descriptions.
 
 Usage: fake_mcp_server.py --tools 3 --desc-bytes 600 --delay-ms 200
 Deterministic, offline, newline-delimited JSON-RPC (no initialized notification required).

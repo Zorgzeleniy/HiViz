@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""exuvia meter: live MCP context footprint + usage telemetry.
+"""hiviz meter: live MCP context footprint + usage telemetry.
 
 For every MCP server in the discovered harness configs:
   - measures the standing context payload (initialize + tools/list →
@@ -26,6 +26,15 @@ import time
 import urllib.request
 from pathlib import Path
 
+
+def _first_existing(*paths: str) -> str:
+    """Prefer the first existing path; else the first argument (the new default)."""
+    for p in paths:
+        if Path(p).exists():
+            return p
+    return paths[0]
+
+
 try:
     import tiktoken
     _enc = tiktoken.get_encoding("cl100k_base")
@@ -38,7 +47,7 @@ except ImportError:
 
 HOME = Path.home()
 INIT_PARAMS = {"protocolVersion": "2025-06-18", "capabilities": {},
-               "clientInfo": {"name": "exuvia-meter", "version": "0.6.0"}}
+               "clientInfo": {"name": "hiviz-meter", "version": "0.6.0"}}
 
 
 def discover_configs(explicit: list[str] | None) -> list[tuple[str, Path]]:
@@ -205,11 +214,11 @@ def mine_usage(server_names: list[str], sessions_dirs: list[Path]) -> dict[str, 
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="exuvia MCP footprint + usage meter")
+    ap = argparse.ArgumentParser(description="hiviz MCP footprint + usage meter")
     ap.add_argument("--config", action="append", help="explicit mcp config path (repeatable)")
     ap.add_argument("--sessions", action="append", default=None,
                     help="session-log dir to mine for usage (repeatable; replaces defaults)")
-    ap.add_argument("--out", default=".exuvia/mcp_footprint.json")
+    ap.add_argument("--out", default=_first_existing(".hiviz/mcp_footprint.json", ".exuvia/mcp_footprint.json"))
     ap.add_argument("--timeout", type=float, default=30.0)
     args = ap.parse_args()
 

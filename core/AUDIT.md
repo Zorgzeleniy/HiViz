@@ -1,4 +1,4 @@
-# Exuvia Audit Procedure
+# HiViz Audit Procedure
 
 Audit standing instructions for prompt debt. **Do not rewrite anything in this phase.**
 
@@ -31,7 +31,7 @@ For every inventoried file compute:
 4. Dead references: every `skill://name`, `@path`, agent name — verify the target exists. **Resolve against the context that OWNS the audited file, not the auditing session**: for omp profiles, check the skills roots listed in THAT profile's `config.yml` (a reference valid where the file lives is NOT dead, even if the auditing session cannot load it). Only flag a reference dead when it resolves in none of the owning context's roots.
 5. Dated snapshots: regex `\d{4}-\d{2}-\d{2}` and version pins `\d+\.\d+(\.\d+)?` — list fact · date/version · age in days.
 6. Few-shot blocks: output examples / mock reports (```-blocks > 10 lines with fabricated data).
-7. Live MCP surfaces (requires python3): run `python <exuvia>/meters/mcp_footprint.py --out .exuvia/mcp_footprint.json`, where `<exuvia>` is the repo checkout or the installed engines dir (`~/.exuvia/engines`). Measures each unique server's standing context payload AND its actual usage mined from session logs — record per-server rows: server · tools · bytes · tokens · calls · last_used. Treat each server as an instruction surface; a server with a permanent token cost and `calls = 0` (or stale `last_used`) is a disable candidate backed by a number, not an opinion.
+7. Live MCP surfaces (requires python3): run `python <hiviz>/meters/mcp_footprint.py --out .hiviz/mcp_footprint.json`, where `<hiviz>` is the repo checkout or the installed engines dir (`~/.hiviz/engines`). Measures each unique server's standing context payload AND its actual usage mined from session logs — record per-server rows: server · tools · bytes · tokens · calls · last_used. Treat each server as an instruction surface; a server with a permanent token cost and `calls = 0` (or stale `last_used`) is a disable candidate backed by a number, not an opinion.
 
 ## Phase 2 — Categorization (if two fit, name the dominant one)
 
@@ -42,7 +42,9 @@ For every inventoried file compute:
 
 ## Phase 3 — Report and decisions file (funnel format)
 
-Write `.exuvia/report-<YYYYMMDD-HHMM>.md` (versioned — NEVER overwrite a previous report: the versioned series is the prompt-debt history) and refresh `.exuvia/report.md` as a copy of the newest one (latest-pointer for existing links and tools).
+If a legacy `.exuvia/` dir exists in the project, READ its facts/report history and WRITE everything to `.hiviz/` from now on (one-time migration; engines fall back automatically).
+
+Write `.hiviz/report-<YYYYMMDD-HHMM>.md` (versioned — NEVER overwrite a previous report: the versioned series is the prompt-debt history) and refresh `.hiviz/report.md` as a copy of the newest one (latest-pointer for existing links and tools).
 
 **Format contract (binding):**
 - The executive line is a literal template — only the numbers change:
@@ -73,14 +75,14 @@ Severity is inherited, never invented: 🔴 = meter-backed disable or a conflict
 ### 4. HTML view (after writing the files)
 
 ```
-python <exuvia>/render/report.py --md .exuvia/report.md --out .exuvia/report.html
+python <hiviz>/render/report.py --md .hiviz/report.md --out .hiviz/report.html
 ```
 
 Tell the user both paths. The HTML is a generated view — never hand-edit it.
 
 ### Decisions file
 
-`.exuvia/decisions.md` mirrors the body: same literal headers, same order, same rows, plus an empty `DECISION` column (`yes / no / as-condition / keep`). The user fills it top-down — most important first.
+`.hiviz/decisions.md` mirrors the body: same literal headers, same order, same rows, plus an empty `DECISION` column (`yes / no / as-condition / keep`). The user fills it top-down — most important first.
 
 Print the executive block into the chat (verbatim) and STOP.
 

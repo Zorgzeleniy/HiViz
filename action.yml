@@ -1,4 +1,4 @@
-name: "exuvia drift check"
+name: "hiviz drift check"
 description: "Deterministic CI gate for standing agent instructions: facts-vs-environment drift + MCP pay-vs-use. No LLM, no API keys."
 branding:
   icon: "check-circle"
@@ -12,14 +12,15 @@ runs:
     - uses: actions/setup-python@v5
       with:
         python-version: "3.11"
-    - name: install exuvia engines
+    - name: install hiviz engines
       shell: bash
-      run: npx -y exuvia@latest init
+      run: npx -y hiviz@latest init
     - name: drift check
       shell: bash
       run: |
-        if [ ! -f .exuvia/facts.toml ]; then
-          echo "no .exuvia/facts.toml — run /exuvia-audit (or ask exuvia to ingest your facts) and commit it. Skipping."
+        if [ ! -f .hiviz/facts.toml ] && [ ! -f .exuvia/facts.toml ]; then
+          echo "no .hiviz/facts.toml — run /hv-audit (or ask hiviz to ingest your facts) and commit it. Skipping."
           exit 0
         fi
-        python ~/.exuvia/engines/drift/check.py --facts .exuvia/facts.toml --base .
+        FACTS=$([ -f .hiviz/facts.toml ] && echo .hiviz/facts.toml || echo .exuvia/facts.toml)
+        python ~/.hiviz/engines/drift/check.py --facts "$FACTS" --base .

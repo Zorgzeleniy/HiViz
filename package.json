@@ -1,19 +1,19 @@
 {
-  "name": "exuvia",
-  "version": "0.6.2",
-  "description": "Audit and refactor standing AI-agent instructions (AGENTS.md/CLAUDE.md/skills/MCP) for prompt debt — probe-verified, safety-preserving; drift checks with MCP usage telemetry, constitution tests, blame provenance, cross-harness translator",
+  "name": "hiviz",
+  "version": "0.7.0",
+  "description": "HiViz — audit and refactor standing AI-agent instructions (AGENTS.md/CLAUDE.md/skills/MCP) for prompt debt. Trace every rule before cutting it: probe-verified, safety-preserving; drift checks with MCP usage telemetry, constitution tests, blame provenance, cross-harness translator. Formerly exuvia.",
   "license": "MIT",
   "author": "Zorgzeleniy",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/Zorgzeleniy/Exuvia.git"
+    "url": "git+https://github.com/Zorgzeleniy/hiviz.git"
   },
   "bugs": {
-    "url": "https://github.com/Zorgzeleniy/Exuvia/issues"
+    "url": "https://github.com/Zorgzeleniy/hiviz/issues"
   },
-  "homepage": "https://github.com/Zorgzeleniy/Exuvia#readme",
+  "homepage": "https://github.com/Zorgzeleniy/hiviz#readme",
   "bin": {
-    "exuvia": "bin/exuvia.js"
+    "hiviz": "bin/hiviz.js"
   },
   "engines": {
     "node": ">=16"
@@ -28,7 +28,6 @@
     "blame/",
     "translate/",
     "render/",
-    "!**/__pycache__",
     "README.md",
     "LICENSE"
   ],
@@ -43,6 +42,7 @@
     "agent-instructions",
     "drift",
     "translator",
-    "context-engineering"
+    "context-engineering",
+    "hiviz"
   ]
 }

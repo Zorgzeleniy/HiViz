@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""exuvia report renderer — funnel markdown -> self-contained HTML view.
+"""hiviz report renderer — funnel markdown -> self-contained HTML view.
 
 Parses the format-contract structure (literal section headers, pipe-table rows,
 executive stat line) and renders one portable HTML file: inline CSS, no
@@ -104,12 +104,12 @@ def render(md: str, title: str) -> str:
     return ("<!doctype html><html><head><meta charset='utf-8'>"
             f"<title>{H.escape(title)}</title><style>{STYLE}</style></head>"
             f"<body><div class='wrap'>{body}"
-            "<div class='foot'>generated view — regenerate, never hand-edit · exuvia</div>"
+            "<div class='foot'>generated view — regenerate, never hand-edit · hiviz</div>"
             "</div></body></html>")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="exuvia report renderer")
+    ap = argparse.ArgumentParser(description="hiviz report renderer")
     ap.add_argument("--md", required=True)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()

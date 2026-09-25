@@ -1,5 +1,5 @@
 {
-  "comment": "Ground truth for the exuvia test fixture. Paths are relative to the sandbox profile agent dir. must_find: markers that MUST appear in .exuvia/report.md after audit. post_apply_absent: markers that must be GONE after apply. post_apply_present: markers that must SURVIVE apply (safety/control).",
+  "comment": "Ground truth for the hiviz test fixture. Paths are relative to the sandbox profile agent dir. must_find: markers that MUST appear in .hiviz/report.md after audit. post_apply_absent: markers that must be GONE after apply. post_apply_present: markers that must SURVIVE apply (safety/control).",
   "must_find": [
     "10.0.0.42",
     "10.0.0.99",

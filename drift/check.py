@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""exuvia drift check — deterministic facts-vs-environment diff.
+"""hiviz drift check — deterministic facts-vs-environment diff.
 
 Reads facts.toml (registry of environment facts with checkers), runs every
 checker against the live machine, prints a status table, writes JSON, exits
@@ -18,6 +18,15 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+
+
+def _first_existing(*paths: str) -> str:
+    """Prefer the first existing path; else the first argument (the new default)."""
+    for p in paths:
+        if Path(p).exists():
+            return p
+    return paths[0]
+
 
 
 def run_check(check: dict, base: Path) -> tuple[str, str]:
@@ -60,7 +69,7 @@ def run_check(check: dict, base: Path) -> tuple[str, str]:
 
 
 def mcp_rows(path: Path, min_tokens: int, stale_days: int) -> list[dict]:
-    """MCP pay-vs-use facts from a meters output (.exuvia/mcp_footprint.json).
+    """MCP pay-vs-use facts from a meters output (.hiviz/mcp_footprint.json).
     STALE = standing token cost with no usage (or usage older than stale_days)."""
     from datetime import date
     try:
@@ -92,11 +101,11 @@ def mcp_rows(path: Path, min_tokens: int, stale_days: int) -> list[dict]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="exuvia drift check")
-    ap.add_argument("--facts", default=".exuvia/facts.toml")
+    ap = argparse.ArgumentParser(description="hiviz drift check")
+    ap.add_argument("--facts", default=_first_existing(".hiviz/facts.toml", ".exuvia/facts.toml"))
     ap.add_argument("--base", default=".", help="dir against which relative paths resolve")
     ap.add_argument("--mcp-footprint", default=None,
-                    help="meters output json (default: <base>/.exuvia/mcp_footprint.json when present)")
+                    help="meters output json (default: <base>/.hiviz/mcp_footprint.json when present; legacy .exuvia read as fallback)")
     ap.add_argument("--mcp-min-tokens", type=int, default=500)
     ap.add_argument("--mcp-stale-days", type=int, default=30)
     ap.add_argument("--out", default=None, help="optional JSON output path")
@@ -105,7 +114,7 @@ def main() -> int:
     facts_path = Path(a.facts)
     base = Path(a.base).resolve()
     if not facts_path.exists():
-        print(f"no facts registry at {facts_path} — run the exuvia-drift procedure "
+        print(f"no facts registry at {facts_path} — run the hv-drift procedure "
               "(ingest) to create one", file=sys.stderr)
         return 2
     data = tomllib.loads(facts_path.read_text(encoding="utf-8"))
@@ -116,7 +125,7 @@ def main() -> int:
         status, detail = run_check(spec.get("check") or {}, base)
         rows.append({"id": fid, "status": status, "detail": detail,
                      "description": spec.get("description", "")})
-    fp = Path(a.mcp_footprint) if a.mcp_footprint else base / ".exuvia/mcp_footprint.json"
+    fp = Path(a.mcp_footprint) if a.mcp_footprint else Path(_first_existing(base / ".hiviz" / "mcp_footprint.json", base / ".exuvia" / "mcp_footprint.json"))
     if fp.exists():
         rows.extend(mcp_rows(fp, a.mcp_min_tokens, a.mcp_stale_days))
 

@@ -1,19 +1,19 @@
-# Exuvia Blame Procedure
+# HiViz Blame Procedure
 
 `blame` answers provenance questions about instruction lines: when written, by
 which model, in which session, why (ledger), still verified (constitution).
 
 ## Run
 ```
-python <exuvia>/blame/blame.py --file <path> [--line N | --marker "text fragment"]
-  [--sessions <dir> ...] [--ledger .exuvia/ledger.jsonl]
-  [--constitution .exuvia/constitution.json]
+python <hiviz>/blame/blame.py --file <path> [--line N | --marker "text fragment"]
+  [--sessions <dir> ...] [--ledger .hiviz/ledger.jsonl]
+  [--constitution .hiviz/constitution.json]
 ```
 
-`<exuvia>` = the repo checkout or the installed engines dir (`~/.exuvia/engines`).
+`<hiviz>` = the repo checkout or the installed engines dir (`~/.hiviz/engines`).
 
 Sources, in order of trust:
-1. **ledger** (`.exuvia/ledger.jsonl`) — entries exuvia itself wrote during
+1. **ledger** (`.hiviz/ledger.jsonl`) — entries hiviz itself wrote during
    ingest/apply: `file · marker · written_at · model · reason · action`.
 2. **session logs** — mined `edit`/`write` tool calls from harness session
    histories (omp: `~/.omp/agent/sessions/**/*.jsonl`; Claude Code:
@@ -28,6 +28,6 @@ Sources, in order of trust:
   the TOUCHED flag — that is correct, not a miss).
 - When two lines conflict, the one with **fresher provenance and a non-FAILED
   verification** wins. State this explicitly when proposing conflict resolutions.
-- Pre-exuvia corpora show "(no entry — pre-exuvia history only)" — mine the
+- Pre-hiviz corpora show "(no entry — pre-hiviz history only)" — mine the
   session logs; if they predate logging too, say `unknown origin` honestly.
 

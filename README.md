@@ -1,18 +1,20 @@
 <div align="center">
 
-# 🐍 EXUVIA
+# 🦺 HIVIZ
 
-**The shed skin of your AI agent. Collected.**
+**Nothing gets cut in the dark.**
 
-**Your agent's instruction files (`CLAUDE.md`, `AGENTS.md`, skills, MCP configs) rot. Exuvia catches the rot — and proves the cleanup lost nothing.**
+**Your agent's instruction files (`CLAUDE.md`, `AGENTS.md`, skills, MCP configs) rot. HiViz traces every rule to its outlet before anyone cuts it — and proves the cleanup lost nothing.**
 
-<a href="https://www.npmjs.com/package/exuvia"><img src="https://img.shields.io/npm/v/exuvia?style=flat-square&color=orange&label=npm" alt="exuvia on npm"></a>
-<a href="https://github.com/Zorgzeleniy/Exuvia/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT"></a>
+<sub>formerly **exuvia** — same engines, same invariants, new vest</sub>
+
+<a href="https://www.npmjs.com/package/hiviz"><img src="https://img.shields.io/npm/v/hiviz?style=flat-square&color=orange&label=npm" alt="hiviz on npm"></a>
+<a href="https://github.com/Zorgzeleniy/hiviz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT"></a>
 <a href="#-quick-start"><img src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex_·_omp_·_Cursor_·_Windsurf_·_OpenCode-blue?style=flat-square" alt="6 harnesses"></a>
 <img src="https://img.shields.io/badge/engines-python_stdlib-teal?style=flat-square" alt="stdlib only">
 <img src="https://img.shields.io/badge/LLM_judgment-optional__and_separated-purple?style=flat-square" alt="human decides">
 
-**One command, no account, no extra API key.** `npx exuvia init` **[→ Quick Start](#-quick-start)**
+**One command, no account, no extra API key.** `npx hiviz init` **[→ Quick Start](#-quick-start)**
 
 </div>
 
@@ -26,9 +28,9 @@
 
 ---
 
-## 🐍 See it
+## 🦺 See it
 
-Every agent accumulates instructions that outlived the truth. Here is a real `AGENTS.md` from an open-source repo — one of the 100 popular configs in the first academic AGENTS.md smells corpus ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)) — before and after exuvia, verbatim excerpts of what the apply actually produced:
+Every agent accumulates instructions that outlived the truth. Here is a real `AGENTS.md` from an open-source repo — one of the 100 popular configs in the first academic AGENTS.md smells corpus ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)) — before and after hiviz, verbatim excerpts of what the apply actually produced:
 
 **Before** — 19,342 bytes, verbatim excerpts:
 
@@ -109,9 +111,9 @@ P2 big changes → alive — ">300 LOC or >3 files — ask for confirmation befo
 P3 AIDEV       → alive — "AIDEV-NOTE / AIDEV-TODO / AIDEV-QUESTION, ≤120 chars" quoted
 ```
 
-> **What's a probe?** The whole proof mechanism, in three sentences. Exuvia opens a brand-new agent session in the background — no chat, just a question — and asks it to quote a rule ("what are your directives about secrets?"). If the fresh session still quotes the rule, the rule is alive, no matter which file it lives in. That's a probe; every "alive" above is one.
+> **What's a probe?** The whole proof mechanism, in three sentences. HiViz opens a brand-new agent session in the background — no chat, just a question — and asks it to quote a rule ("what are your directives about secrets?"). If the fresh session still quotes the rule, the rule is alive, no matter which file it lives in. That's a probe; every "alive" above is one.
 
-> Snakes don't shrink. They shed what stopped fitting. Your config should too.
+> **Who is HiViz?** The one everybody calls by the vest. Comes in at 6:15, after the lazy senior left at 6:00 — working code, and a nest of wires under the desk that's been "temporary" for two years. He doesn't rewrite what the senior built. He traces what's still live, tags everything `live` / `dead` (the tags are yours to place, not his), and never throws anything out on the day he finds it. *The mess isn't stupid. It's just unmapped.*
 
 ### It also catches things linters can't even see
 
@@ -153,7 +155,7 @@ In July 2026, Anthropic engineers reported removing over 80% of Claude Code's sy
 
 Meanwhile your `CLAUDE.md`, skills, subagents and MCP configs keep growing. Every "add a line to fix it" is a loan. The interest compounds as duplicates diverge and facts rot.
 
-Linters see file structure. Exuvia sees the loop: **what the instructions claim vs what the machine says vs what the model actually does** — and closes all three gaps with evidence, not vibes. The taxonomy matches the first academic catalog of AGENTS.md smells ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)).
+Linters see file structure. HiViz sees the loop: **what the instructions claim vs what the machine says vs what the model actually does** — and closes all three gaps with evidence, not vibes. The taxonomy matches the first academic catalog of AGENTS.md smells ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)).
 
 A preregistered 4,643-run study put numbers on the mechanism ([arXiv 2608.01347](https://arxiv.org/abs/2608.01347)): prompt **length** is nearly free — verbose repetition measures ~1.0× — while phrases that **order extra work** are not. "Compare several approaches" multiplies reasoning 2.4–7.4× at zero correctness gain; certainty language ("make absolutely sure") inflates output up to 4.1×, buying re-verification loops, not success. The most dangerous line in your config isn't the verbose one — it's the *plausible wrong hint*: misleading architectural hints raised reasoning 2.61× — the costliest input defect measured — while irrelevant noise measured nearly free (1.03×). And the harness amplifies all of it: a heavy standing prefix replays those consequences every single turn.
 
@@ -161,10 +163,10 @@ A preregistered 4,643-run study put numbers on the mechanism ([arXiv 2608.01347]
 
 ## 📈 It compounds
 
-Everything exuvia does leaves working material behind — and nothing gets lost between runs:
+Everything hiviz does leaves working material behind — and nothing gets lost between runs:
 
 - After an audit you keep the report, your decisions file, a facts checklist, and a change log. The next audit starts from them, not from zero.
-- While you work, exuvia counts which MCP tools actually get called and remembers where every instruction line came from. The longer you've been running agents, the better it can answer "is this instruction earning its tokens?"
+- While you work, hiviz counts which MCP tools actually get called and remembers where every instruction line came from. The longer you've been running agents, the better it can answer "is this instruction earning its tokens?"
 - When you switch tools (Claude Code → Codex → Cursor), it carries your instructions over and checks nothing got lost on the way.
 
 It starts as a linter. It grows into the history of every rule you approved, tested, and shed.
@@ -173,21 +175,21 @@ It starts as a linter. It grows into the history of every rule you approved, tes
 
 ## ⚡ Quick Start
 
-Detects every supported agent on your machine, installs the right adapter into each, deploys the python engines to `~/.exuvia/engines`. Safe to re-run.
+Detects every supported agent on your machine, installs the right adapter into each, deploys the python engines to `~/.hiviz/engines`. Safe to re-run.
 
-**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. Changed your mind: `npx exuvia uninstall`. Windows gotchas live in the [RUNBOOK](./RUNBOOK.md).
+**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. Changed your mind: `npx hiviz uninstall`. Windows gotchas live in the [RUNBOOK](./RUNBOOK.md).
 
 ```bash
-npx exuvia init
+npx hiviz init
 ```
 
 ### 🕐 The first five minutes
 
-1. **Run the audit.** `/exuvia-audit` (Claude Code, Codex) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule / conflict — with a recommendation each.
-2. **Decide.** Fill the DECISION column in `.exuvia/decisions.md`: yes / no / as-condition / merge. Exuvia never decides for you — analysis and action are separate sessions, on purpose.
-3. **Apply.** `/exuvia-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule. A probe that fails restores the line from backup.
-4. **Check drift.** `/exuvia-drift` diffs your facts registry against the live machine — milliseconds, no LLM, and half of real-world findings.
-5. **Test your constitution.** `/exuvia-test` runs probe tests for your load-bearing rules. Wire it into CI: a PR that breaks a standing rule's binding goes red.
+1. **Run the audit.** `/hv-audit` (Claude Code, Codex) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule / conflict — with a recommendation each.
+2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / merge. HiViz never decides for you — analysis and action are separate sessions, on purpose.
+3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule. A probe that fails restores the line from backup.
+4. **Check drift.** `/hv-drift` diffs your facts registry against the live machine — milliseconds, no LLM, and half of real-world findings.
+5. **Test your constitution.** `/hv-test` runs probe tests for your load-bearing rules. Wire it into CI: a PR that breaks a standing rule's binding goes red.
 
 ---
 
@@ -222,27 +224,27 @@ From this repo — pilot scale (4 tasks × 5 repeats × 2 arms, one model), so r
 
 | Command (Claude Code / Codex) | What it does |
 |---|---|
-| `/exuvia-audit` | 5-category revision of your instruction corpus → report + decisions file (you decide) |
-| `/exuvia-apply` | executes exactly your decisions: backups, edits, ledger, probes that quote every surviving rule |
-| `/exuvia-drift` | facts-vs-environment diff: which standing facts are STALE |
-| `/exuvia-test` | constitution tests: prove rules are LIVE in fresh sessions |
-| `/exuvia-translate` | migrate the corpus between harnesses (omp↔Claude↔Codex↔Cursor), probe-checked equivalence |
-| `/exuvia-blame` | provenance for any instruction line: ledger + session-log mining — who wrote it, when, why |
+| `/hv-audit` | 5-category revision of your instruction corpus → report + decisions file (you decide) |
+| `/hv-apply` | executes exactly your decisions: backups, edits, ledger, probes that quote every surviving rule |
+| `/hv-drift` | facts-vs-environment diff: which standing facts are STALE |
+| `/hv-test` | constitution tests: prove rules are LIVE in fresh sessions |
+| `/hv-translate` | migrate the corpus between harnesses (omp↔Claude↔Codex↔Cursor), probe-checked equivalence |
+| `/hv-blame` | provenance for any instruction line: ledger + session-log mining — who wrote it, when, why |
 
-omp: all five install as skills and auto-trigger on plain asks (*"audit my prompt debt"*) — they wake when you ask, never on their own. Cursor / Windsurf / OpenCode: a single audit adapter (audit + apply). Engines: `~/.exuvia/engines` (python stdlib, zero dependencies).
+omp: all five install as skills and auto-trigger on plain asks (*"audit my prompt debt"*) — they wake when you ask, never on their own. Cursor / Windsurf / OpenCode: a single audit adapter (audit + apply). Engines: `~/.hiviz/engines` (python stdlib, zero dependencies).
 
 ### Where things live
 
-In your project, `.exuvia/`: `report.md` + `decisions.md` (audit), `probes-*.md` (apply proof), `ledger.jsonl` (change log), `facts.toml` (drift checklist), `tests/*.toml` (constitution), `mcp_footprint.json` (meters) — plus the reports each engine emits (`drift-report.md`, `constitution.json`, `report.html`, `ir.jsonl` — the intermediate format), all in the same place. On your machine: adapters inside each agent's config dir, engines in `~/.exuvia/engines`. Nothing lands anywhere else.
+In your project, `.hiviz/`: `report.md` + `decisions.md` (audit), `probes-*.md` (apply proof), `ledger.jsonl` (change log), `facts.toml` (drift checklist), `tests/*.toml` (constitution), `mcp_footprint.json` (meters) — plus the reports each engine emits (`drift-report.md`, `constitution.json`, `report.html`, `ir.jsonl` — the intermediate format), all in the same place. On your machine: adapters inside each agent's config dir, engines in `~/.hiviz/engines`. Nothing lands anywhere else.
 
 ---
 
 ### Run it in CI
 
-After an audit leaves `.exuvia/facts.toml` in your repo, the deterministic drift gate runs keyless in any CI — zero-config as a GitHub Action:
+After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift gate runs keyless in any CI — zero-config as a GitHub Action:
 
 ```yaml
-- uses: Zorgzeleniy/Exuvia@main
+- uses: Zorgzeleniy/hiviz@main
 ```
 
 That's the whole step: it installs the engines and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). Constitution probes need a live agent, so those stay a local/agent-CLI concern, not CI.
@@ -264,12 +266,13 @@ The five invariants are the product. Breaking any of them is a semver-major deci
 
 | Term | Plain meaning |
 |---|---|
+| **HiViz** | the vest you wear so nobody cuts a live wire by accident — and *viz.* ("namely"): this rule is alive, that one is dead. Every decision leaves a tag and a drawer entry. |
 | **probe** | a background agent session asked to quote one rule — if it quotes, the rule is alive |
 | **AGENTS.md / CLAUDE.md** | the file where your agent's standing instructions live; same role, different tool names |
 | **harness** | the agent tool itself (Claude Code, Codex, Cursor, Windsurf, omp, OpenCode) |
 | **instruction corpus** | all your standing instructions together: CLAUDE.md/AGENTS.md, skills, subagent prompts, MCP tool descriptions |
 | **drift** | a standing instruction that no longer matches the actual machine (path moved, tool updated, port closed) |
-| **ledger** | a local change log exuvia keeps: who wrote/changed which line, when, and why |
+| **ledger** | a local change log hiviz keeps: who wrote/changed which line, when, and why |
 | **omp** | Oh My Pi — an open-source terminal coding agent, one of the five supported tools |
 | **headless session** | an agent run with no interactive chat — a question in, an answer out, used for probes |
 

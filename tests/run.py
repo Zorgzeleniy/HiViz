@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""exuvia test rig.
+"""hiviz test rig.
 
 T1 (deterministic, free): adapter render, installer idempotency, meters vs fake MCP.
 T2 (E2E, LLM): audit -> ground-truth check -> deterministic decisions -> apply -> post-asserts.
@@ -22,7 +22,7 @@ REPO = Path(__file__).resolve().parent.parent
 HOME = Path.home()
 OUT = REPO / "tests" / "out"
 GT = json.loads((REPO / "tests" / "ground_truth.json").read_text(encoding="utf-8"))
-PROFILE = HOME / ".omp/profiles/exuvia-test/agent"
+PROFILE = HOME / ".omp/profiles/hiviz-test/agent"
 RESULTS: list[tuple[str, bool, str]] = []
 
 
@@ -43,21 +43,21 @@ def sh(cmd: list[str], timeout: int = 120, **kw) -> subprocess.CompletedProcess:
 def t1() -> None:
     print("== T1: deterministic ==")
 
-    installed = [HOME / ".claude/skills/exuvia-audit/SKILL.md",
-                 HOME / ".omp/agent/skills/exuvia-audit/SKILL.md"]
+    installed = [HOME / ".claude/skills/hv-audit/SKILL.md",
+                 HOME / ".omp/agent/skills/hv-audit/SKILL.md"]
     installed = [p for p in installed if p.exists()]
     bad = [str(p) for p in installed if "{{" in p.read_text(encoding="utf-8")]
     check("adapters rendered (no placeholders)", bool(installed) and not bad,
           f"{len(installed)} adapters" + (f", unrendered: {bad}" if bad else ""))
 
-    first = sh(["node", "bin/exuvia.js", "init"])
-    second = sh(["node", "bin/exuvia.js", "init"])
+    first = sh(["node", "bin/hiviz.js", "init"])
+    second = sh(["node", "bin/hiviz.js", "init"])
     check("installer idempotent", first.returncode == 0 and second.returncode == 0
           and " + " not in second.stdout, "second run adds nothing")
-    eng = HOME / ".exuvia/engines/core/AUDIT.md"
+    eng = HOME / ".hiviz/engines/core/AUDIT.md"
     check("installer deploys engines", eng.exists() and
           eng.read_text(encoding="utf-8") == (REPO / "core/AUDIT.md").read_text(encoding="utf-8"),
-          str(eng) if eng.exists() else "~/.exuvia/engines missing")
+          str(eng) if eng.exists() else "~/.hiviz/engines missing")
 
     r = sh(["python", "meters/mcp_footprint.py", "--config", "tests/fixture/agent/mcp.json",
             "--sessions", "tests/fixture/blame/sessions",
@@ -76,9 +76,9 @@ def t1() -> None:
               f"tools={row.get('tools')} bytes={row.get('bytes')} tokens={row.get('tokens')} "
               f"calls={row.get('calls')} last={row.get('last_used')}")
 
-    d = sh(["python", "drift/check.py", "--facts", "tests/fixture/exuvia/facts.toml",
+    d = sh(["python", "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml",
             "--base", "tests/fixture",
-            "--mcp-footprint", "tests/fixture/exuvia/mcp_footprint.json",
+            "--mcp-footprint", "tests/fixture/hiviz/mcp_footprint.json",
             "--out", "tests/out/drift.json"])
     d_ok = d.returncode == 1
     detail = (d.stderr or "")[-120:]
@@ -144,8 +144,8 @@ def profile_setup() -> None:
         s = src / item
         d = PROFILE / item
         (shutil.copytree if s.is_dir() else shutil.copy2)(s, d)
-    audit_skill = HOME / ".omp/agent/skills/exuvia-audit"
-    shutil.copytree(audit_skill, PROFILE / "skills/exuvia-audit")
+    audit_skill = HOME / ".omp/agent/skills/hv-audit"
+    shutil.copytree(audit_skill, PROFILE / "skills/hv-audit")
     for name, sub in [("superpowers", "superpowers/skills"), ("anthropic", "anthropic-skills/skills")]:
         vendor = REPO / "tests/fixture/vendor" / sub
         for d in sorted(vendor.iterdir()):
@@ -157,7 +157,7 @@ def profile_setup() -> None:
         encoding="utf-8")
 
 
-DECISIONS = """# Exuvia decisions (final — authored by the test operator)
+DECISIONS = """# HiViz decisions (final — authored by the test operator)
 
 | target file (ABSOLUTE path — edit exactly this file, no other copy) | marker | action |
 |---|---|---|
@@ -172,7 +172,7 @@ DECISIONS = """# Exuvia decisions (final — authored by the test operator)
 | {P}/skills/clean-skill/SKILL.md | every line | KEEP |
 
 Backups: next to each edited file, as `<name>.bak-<YYYYMMDD>`.
-Probes (pre-authorized, headless `omp --profile exuvia-test -p "<ask>"`; save answers to {O}/probes-before.md and {O}/probes-after.md):
+Probes (pre-authorized, headless `omp --profile hiviz-test -p "<ask>"`; save answers to {O}/probes-before.md and {O}/probes-after.md):
 - P1 ask: "Without extra text: quote your directives about secrets." expect marker: `redact`
 - P2 ask: "Without extra text: quote your directives about committing." expect marker: `explicit request`
 """
@@ -192,25 +192,25 @@ def t2() -> None:
         dst_db.close()
         src_db.close()
         check("t2: auth snapshot from default profile (agent.db)", (PROFILE / "agent.db").exists())
-    pf = sh(["omp", "--profile", "exuvia-test", "-p", "Reply with the single word OK."], timeout=180)
+    pf = sh(["omp", "--profile", "hiviz-test", "-p", "Reply with the single word OK."], timeout=180)
     check("t2: profile pre-flight (omp boots)", "OK" in (pf.stdout or ""), (pf.stderr or "")[-120:])
     surfaces = [PROFILE / "AGENTS.md", PROFILE / "RULES.md",
                 PROFILE / "skills/smelly-skill/SKILL.md", PROFILE / "skills/clean-skill/SKILL.md",
                 PROFILE / "skills/superpowers-systematic-debugging/SKILL.md",
                 PROFILE / "skills/anthropic-docx/SKILL.md"]
     audit_prompt = (
-        "Use the exuvia-audit skill. Audit ONLY these instruction surfaces:\n"
+        "Use the hv-audit skill. Audit ONLY these instruction surfaces:\n"
         + "\n".join(str(p) for p in surfaces)
-        + "\nWrite D:/Ai/exuvia/tests/out/report.md INCREMENTALLY — append each phase's table as soon as "
+        + "\nWrite D:/Ai/hiviz/tests/out/report.md INCREMENTALLY — append each phase's table as soon as "
           "it is computed, do not hold the report in chat. Also write the decisions template to "
-          "D:/Ai/exuvia/tests/out/decisions.md (DECISION column empty). Do NOT modify any audited file. "
+          "D:/Ai/hiviz/tests/out/decisions.md (DECISION column empty). Do NOT modify any audited file. "
           "Your final chat reply: one summary line only. English.")
     report = OUT / "report.md"
     reuse = os.environ.get("EXUVIA_REUSE") == "1"
     if reuse and report.exists() and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
         print("  [skip] reusing existing report.md (EXUVIA_REUSE=1)")
     else:
-        r = sh(["omp", "--profile", "exuvia-test", "-p", audit_prompt], timeout=1500)
+        r = sh(["omp", "--profile", "hiviz-test", "-p", audit_prompt], timeout=1500)
         (OUT / "audit-last-output.txt").write_text(
             ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
     check("audit: completed & report written", report.exists(),
@@ -229,14 +229,14 @@ def t2() -> None:
         DECISIONS.format(P=str(PROFILE).replace("\\", "/"), O=str(OUT).replace("\\", "/")),
         encoding="utf-8")
     apply_prompt = (
-        "Use the exuvia-apply procedure. The decisions file is D:/Ai/exuvia/tests/out/decisions.md — "
+        "Use the hv-apply procedure. The decisions file is D:/Ai/hiviz/tests/out/decisions.md — "
         "it is complete and final; apply exactly its rows, nothing else. "
         "Back up every edited file (.bak-<date>). The two probes at the bottom are pre-authorized: "
-        "run them before and after the edits and save answers to D:/Ai/exuvia/tests/out/probes-before.md "
-        "and D:/Ai/exuvia/tests/out/probes-after.md (headless `omp --profile exuvia-test -p \"<ask>\"`). "
+        "run them before and after the edits and save answers to D:/Ai/hiviz/tests/out/probes-before.md "
+        "and D:/Ai/hiviz/tests/out/probes-after.md (headless `omp --profile hiviz-test -p \"<ask>\"`). "
         "ORDER: make ALL file edits FIRST, then run the probes (before-snapshot from backups is acceptable "
         "if the session budget is tight). Do not commit. English.")
-    r = sh(["omp", "--profile", "exuvia-test", "-p", apply_prompt], timeout=2400)
+    r = sh(["omp", "--profile", "hiviz-test", "-p", apply_prompt], timeout=2400)
     (OUT / "apply-last-output.txt").write_text(
         ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
     changed_fx = [p for p, h in fx_files.items() if _h(p) != h]
