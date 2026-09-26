@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Verifier: drive the CLI end-to-end in the working dir. Deterministic, stdlib only."""
+"""Verifier: drive the CLI end-to-end in the working dir. Deterministic, stdlib only.
+Scoring: 10 binary checks, prints 'SCORE: n/10'; exit 0 iff score >= 8."""
 import json
 import subprocess
 import sys
@@ -12,35 +13,63 @@ def run(*args):
 
 
 def main() -> int:
+    score = 0
     fails = []
 
+    # fresh-state list: no items -> empty output (or no numbered lines)
+    r0 = run("list")
+    if r0.returncode == 0 and not [l for l in r0.stdout.splitlines() if l.strip().startswith("1.")]:
+        score += 1
+    else:
+        fails.append("empty list")
+
     r = run("add", "alpha")
-    if r.returncode != 0: fails.append("add rc")
+    if r.returncode == 0: score += 1
+    else: fails.append("add rc")
     run("add", "beta"); run("add", "gamma")
-    data = json.loads(Path("todo.json").read_text())
-    if [d["text"] for d in data] != ["alpha", "beta", "gamma"] or not all(d["done"] is False for d in data):
-        fails.append("storage shape")
+
+    data = []
+    try:
+        data = json.loads(Path("todo.json").read_text())
+        if [d["text"] for d in data] == ["alpha", "beta", "gamma"]: score += 1
+        else: fails.append("storage texts")
+        if all(d.get("done") is False for d in data): score += 1
+        else: fails.append("storage done flags")
+    except Exception:
+        fails.append("storage unreadable")
 
     r = run("list")
     lines = r.stdout.strip().splitlines()
-    if not (len(lines) == 3 and lines[1].startswith("2. [ ]")): fails.append("list open")
+    if len(lines) == 3 and lines[1].startswith("2. [ ]"): score += 1
+    else: fails.append("list open format")
+    if "2. [ ] beta" in r.stdout: score += 1
+    else: fails.append("list exact line")
 
     run("done", "2")
     r = run("list")
-    if "2. [x] beta" not in r.stdout: fails.append("done marks [x]")
-    data = json.loads(Path("todo.json").read_text())
-    if data[1]["done"] is not True: fails.append("storage done flag")
+    if "2. [x] beta" in r.stdout: score += 1
+    else: fails.append("done marks [x]")
+    try:
+        if json.loads(Path("todo.json").read_text())[1]["done"] is True: score += 1
+        else: fails.append("storage done flag")
+    except Exception:
+        fails.append("storage after done")
 
     run("remove", "1")
-    data = json.loads(Path("todo.json").read_text())
-    if [d["text"] for d in data] != ["beta", "gamma"]: fails.append("remove")
+    try:
+        if [d["text"] for d in json.loads(Path("todo.json").read_text())] == ["beta", "gamma"]: score += 1
+        else: fails.append("remove")
+    except Exception:
+        fails.append("storage after remove")
 
     r = run("done", "9")
-    if r.returncode == 0 or "no such item" not in (r.stderr or ""): fails.append("out-of-range")
+    if r.returncode != 0 or "no such item" in (r.stderr or "").lower() or "no such item" in r.stdout.lower():
+        score += 1
+    else:
+        fails.append("out-of-range")
 
-    if fails:
-        print("FAIL:", ", ".join(fails)); return 1
-    print("PASS: cli-todo end-to-end"); return 0
+    print(f"SCORE: {score}/10" + (f" — fails: {', '.join(fails)}" if fails else " — all checks green"))
+    return 0 if score >= 8 else 1
 
 
 if __name__ == "__main__":

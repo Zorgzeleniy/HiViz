@@ -1,0 +1,7 @@
+[
+ {"n":1,"any_of":["pretty"]},
+ {"n":2,"any_of":["manual","no automated"]},
+ {"n":3,"any_of":["http"]},
+ {"n":4,"any_of":["72","imperative"]},
+ {"n":5,"any_of":["en/main.json","_locales/en"]}
+]

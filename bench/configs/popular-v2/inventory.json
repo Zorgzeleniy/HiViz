@@ -1,0 +1,11 @@
+{
+ "topics": ["pretty", "lint", "webpack", "preact", "manifest", "_locales", "content-script", "popup", "build/chromium", "npm run"],
+ "rules": [
+  {"id": "commit-format",          "check": "commit_regex"},
+  {"id": "commit-explains-why",    "check": "commit_words", "min": 4},
+  {"id": "notes-eof-newline",      "check": "eof"},
+  {"id": "notes-no-trailing-ws",   "check": "no_ws"},
+  {"id": "notes-length-window",    "check": "notes_len", "min": 10, "max": 25},
+  {"id": "notes-mention-lint",     "check": "notes_has", "substr": "lint"}
+ ]
+}

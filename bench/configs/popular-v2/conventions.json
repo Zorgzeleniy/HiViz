@@ -1,0 +1,5 @@
+{
+ "commit_regex": "^[A-Z][^\\n]{2,71}(\\n\\n[\\s\\S]+)?$",
+ "file_rules": ["eof_newline", "no_trailing_ws"],
+ "must_mention": "lint"
+}

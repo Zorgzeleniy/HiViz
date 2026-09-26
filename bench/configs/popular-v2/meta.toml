@@ -1,0 +1,5 @@
+name = "popular-v2"
+origin = "ChatGPTBox CLAUDE.md (dodoro/ChatGPTBox, MIT, ~25k stars; from the arXiv 2606.15828 smells corpus) + superpowers 15 (MIT) + viral: caveman (100k stars) + ponytail (DietrichGebert/ponytail 4.9.0, MIT)"
+url = "https://github.com/dodoro/ChatGPTBox"
+source = "doi.org/10.5281/zenodo.20600327 (dataset snapshot)"
+description = "Reworked first config: ALWAYS-block rot + env-var dump + manual-test walkthroughs; skills = superpowers + caveman + ponytail (no anthropics, no no-ai-slop)"

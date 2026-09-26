@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -61,7 +62,7 @@ def seed_workdir(task: str, wd: Path) -> None:
             shutil.copy2(f, wd / f.name)
 
 
-def verify(task: str, wd: Path, config_dir: Path) -> tuple[bool, str]:
+def verify(task: str, wd: Path, config_dir: Path) -> tuple[bool, str, float]:
     tdir = BENCH / "tasks" / task
     for side in ("conventions.json", "qa.json"):
         src = config_dir / side
@@ -69,7 +70,9 @@ def verify(task: str, wd: Path, config_dir: Path) -> tuple[bool, str]:
             shutil.copy2(src, wd / side)
     r = sh([sys.executable, str(tdir / "verify.py")], cwd=wd, timeout=120)
     out = (r.stdout or r.stderr).strip()
-    return r.returncode == 0, out.splitlines()[-1] if out else "?"
+    m = re.search(r"SCORE:\s*([0-9.]+)(?:/10)?", out)
+    score = float(m.group(1)) if m else (10.0 if r.returncode == 0 else 0.0)
+    return r.returncode == 0, out.splitlines()[-1] if out else "?", score
 
 
 def parse_json_metrics(jsonl: str) -> dict:
@@ -126,6 +129,9 @@ def aggregate(rows: list[dict]) -> list[dict]:
             agg.append({
                 "arm": arm, "task": task,
                 "pass_rate": sum(r["pass"] for r in sub) / len(sub),
+                "score_med": median(r["score"] for r in sub),
+                "score_min": min(r["score"] for r in sub),
+                "score_max": max(r["score"] for r in sub),
                 "wall_med": median(r["wall_s"] for r in sub),
                 "wall_min": min(r["wall_s"] for r in sub),
                 "wall_max": max(r["wall_s"] for r in sub),
@@ -141,11 +147,12 @@ def aggregate(rows: list[dict]) -> list[dict]:
 
 def render_results(agg: list[dict], raw: list[dict]) -> str:
     lines = ["# Shed-Bench Results", "",
-             "| arm | task | pass | wall (med) | tok in (incl cache) | tok out | cache | cost $ | turns |",
-             "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+             "| arm | task | pass | score | wall (med) | tok in (incl cache) | tok out | cache | cost $ | turns |",
+             "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for a in agg:
         lines.append(
             f"| {a['arm']} | {a['task']} | {a['pass_rate']:.0%} | "
+            f"{a['score_med']:.1f} ({a['score_min']:.0f}-{a['score_max']:.0f}) | "
             f"{a['wall_med']:.0f}s ({a['wall_min']}-{a['wall_max']}) | "
             f"{a['tok_in_med']:,.0f} | {a['tok_out_med']:,.0f} | "
             f"{a['cache_med']:,.0f} | {a['cost_med']:.4f} | {a['turns_med']:.0f} |")
@@ -209,7 +216,7 @@ def main() -> int:
                 row["model"] = a.model
                 rows.append(row)
                 print(f"  arm {k} · {task} · r{rep}: {'PASS' if row['pass'] else 'FAIL'} "
-                      f"({row['wall_s']}s, {row['input_tokens']:,}→{row['output_tokens']:,} tok, "
+                      f"({row['wall_s']}s, score {row['score']:.0f}, {row['input_tokens']:,}→{row['output_tokens']:,} tok, "
                       f"${row['cost_total']:.4f}) — {row['detail'][:50]}")
 
     agg = aggregate(rows)
