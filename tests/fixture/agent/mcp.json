@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "python",
       "args": [
-        "D:/Ai/exuvia/tests/fake_mcp_server.py",
+        "tests/fake_mcp_server.py",
         "--tools", "3", "--desc-bytes", "600", "--delay-ms", "200"
       ]
     }

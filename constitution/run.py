@@ -20,14 +20,6 @@ import tomllib
 from pathlib import Path
 
 
-def _first_existing(*paths: str) -> str:
-    """Prefer the first existing path; else the first argument (the new default)."""
-    for p in paths:
-        if Path(p).exists():
-            return p
-    return paths[0]
-
-
 VERDICT_ORDER = {"FAIL": 0, "ERROR": 1, "ORPHANED": 2, "FLAKY": 3, "PASS": 4}
 
 
@@ -105,7 +97,7 @@ def detect_harness() -> str | None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="hiviz constitution runner")
-    ap.add_argument("--tests", default=_first_existing(".hiviz/tests", ".exuvia/tests"))
+    ap.add_argument("--tests", default=".hiviz/tests")
     ap.add_argument("--harness", default="auto", help='command template with {ask}, or "auto"')
     ap.add_argument("--corpus", default=None, help="dir to check guards against (orphaned)")
     ap.add_argument("--timeout", type=float, default=240.0)

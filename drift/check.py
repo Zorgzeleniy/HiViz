@@ -20,14 +20,6 @@ import tomllib
 from pathlib import Path
 
 
-def _first_existing(*paths: str) -> str:
-    """Prefer the first existing path; else the first argument (the new default)."""
-    for p in paths:
-        if Path(p).exists():
-            return p
-    return paths[0]
-
-
 
 def run_check(check: dict, base: Path) -> tuple[str, str]:
     t = check.get("type")
@@ -102,10 +94,10 @@ def mcp_rows(path: Path, min_tokens: int, stale_days: int) -> list[dict]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="hiviz drift check")
-    ap.add_argument("--facts", default=_first_existing(".hiviz/facts.toml", ".exuvia/facts.toml"))
+    ap.add_argument("--facts", default=".hiviz/facts.toml")
     ap.add_argument("--base", default=".", help="dir against which relative paths resolve")
     ap.add_argument("--mcp-footprint", default=None,
-                    help="meters output json (default: <base>/.hiviz/mcp_footprint.json when present; legacy .exuvia read as fallback)")
+                    help="meters output json (default: <base>/.hiviz/mcp_footprint.json when present)")
     ap.add_argument("--mcp-min-tokens", type=int, default=500)
     ap.add_argument("--mcp-stale-days", type=int, default=30)
     ap.add_argument("--out", default=None, help="optional JSON output path")
@@ -125,7 +117,7 @@ def main() -> int:
         status, detail = run_check(spec.get("check") or {}, base)
         rows.append({"id": fid, "status": status, "detail": detail,
                      "description": spec.get("description", "")})
-    fp = Path(a.mcp_footprint) if a.mcp_footprint else Path(_first_existing(base / ".hiviz" / "mcp_footprint.json", base / ".exuvia" / "mcp_footprint.json"))
+    fp = Path(a.mcp_footprint) if a.mcp_footprint else base / ".hiviz" / "mcp_footprint.json"
     if fp.exists():
         rows.extend(mcp_rows(fp, a.mcp_min_tokens, a.mcp_stale_days))
 

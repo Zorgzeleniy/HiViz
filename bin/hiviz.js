@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// hiviz (formerly exuvia) — uniform installer for Claude Code / Codex / omp / Cursor / Windsurf / OpenCode adapters.
+// hiviz — uniform installer for Claude Code / Codex / omp / Cursor / Windsurf / OpenCode adapters.
 // Zero dependencies. Renders adapters from core/ + templates/ so all harnesses share one source of truth.
 "use strict";
 const fs = require("fs");
@@ -83,16 +83,6 @@ function harnesses() {
   ];
 }
 
-// adapter files/dirs written by the pre-rename "exuvia" installer — removed on uninstall
-const LEGACY = [].concat(
-  ["audit", "apply", "drift", "test", "blame", "translate"].map((v) => path.join(HOME, ".claude", "commands", `exuvia-${v}.md`)),
-  ["audit", "apply", "drift", "test", "blame", "translate"].map((v) => path.join(HOME, ".codex", "prompts", `exuvia-${v}.md`)),
-  [path.join(HOME, ".codex", "skills", "exuvia-audit", "SKILL.md")],
-  ["audit", "drift", "constitution", "blame", "translate"].map((v) => path.join(HOME, ".omp", "agent", "skills", `exuvia-${v}`, "SKILL.md")),
-  [path.join(HOME, ".cursor", "rules", "exuvia.mdc")],
-  [path.join(HOME, ".config", "opencode", "command", "exuvia.md")],
-);
-
 function copyTree(src, dst, dry) {
   let wrote = 0;
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {
@@ -159,9 +149,8 @@ function uninstall() {
   for (const h of harnesses()) {
     for (const [dest] of h.targets) rm(dest, h.name);
   }
-  for (const p of LEGACY) rm(p, "legacy");
-  for (const dir of [path.join(HOME, ".hiviz"), path.join(HOME, ".exuvia")]) {
-    if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); console.log(`  - removed ${dir === path.join(HOME, ".hiviz") ? "~/.hiviz" : "~/.exuvia"} (engines)`); }
+  for (const dir of [path.join(HOME, ".hiviz")]) {
+    if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); console.log("  - removed ~/.hiviz (engines)"); }
   }
 }
 

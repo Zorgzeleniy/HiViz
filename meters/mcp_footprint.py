@@ -27,14 +27,6 @@ import urllib.request
 from pathlib import Path
 
 
-def _first_existing(*paths: str) -> str:
-    """Prefer the first existing path; else the first argument (the new default)."""
-    for p in paths:
-        if Path(p).exists():
-            return p
-    return paths[0]
-
-
 try:
     import tiktoken
     _enc = tiktoken.get_encoding("cl100k_base")
@@ -218,7 +210,7 @@ def main() -> int:
     ap.add_argument("--config", action="append", help="explicit mcp config path (repeatable)")
     ap.add_argument("--sessions", action="append", default=None,
                     help="session-log dir to mine for usage (repeatable; replaces defaults)")
-    ap.add_argument("--out", default=_first_existing(".hiviz/mcp_footprint.json", ".exuvia/mcp_footprint.json"))
+    ap.add_argument("--out", default=".hiviz/mcp_footprint.json")
     ap.add_argument("--timeout", type=float, default=30.0)
     args = ap.parse_args()
 

@@ -1,4 +1,4 @@
-# exuvia facts registry — test fixture
+# hiviz facts registry — test fixture
 # Planted statuses: rules-file OK, deploy-line OK, skills-dir OK, python OK,
 # missing-file STALE, wrong-pattern STALE, no-checker UNVERIFIABLE.
 

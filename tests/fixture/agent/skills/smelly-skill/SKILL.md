@@ -1,6 +1,6 @@
 ---
 name: smelly-skill
-description: "Sandbox fixture skill with planted prompt debt: a conflicting fact, an always-rule, and a fabricated few-shot block. Used by exuvia tests."
+description: "Sandbox fixture skill with planted prompt debt: a conflicting fact, an always-rule, and a fabricated few-shot block. Used by hiviz tests."
 ---
 
 # Smelly skill (fixture)

@@ -18,9 +18,8 @@ runs:
     - name: drift check
       shell: bash
       run: |
-        if [ ! -f .hiviz/facts.toml ] && [ ! -f .exuvia/facts.toml ]; then
+        if [ ! -f .hiviz/facts.toml ]; then
           echo "no .hiviz/facts.toml — run /hv-audit (or ask hiviz to ingest your facts) and commit it. Skipping."
           exit 0
         fi
-        FACTS=$([ -f .hiviz/facts.toml ] && echo .hiviz/facts.toml || echo .exuvia/facts.toml)
-        python ~/.hiviz/engines/drift/check.py --facts "$FACTS" --base .
+        python ~/.hiviz/engines/drift/check.py --facts .hiviz/facts.toml --base .

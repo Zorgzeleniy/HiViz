@@ -3,7 +3,7 @@
 
 Answers: when was this line written, by which model, in which session, why
 (ledger), and is it still verified (constitution). Sources, in order of trust:
-  1. .hiviz/ledger.jsonl — entries written by hiviz ingest/apply (.exuvia/ledger.jsonl is read as legacy fallback)
+  1. .hiviz/ledger.jsonl — entries written by hiviz ingest/apply
   2. harness session logs  — mined edit/write tool calls (omp: ~/.omp/agent/sessions)
 
 Stdlib only. Read-only.

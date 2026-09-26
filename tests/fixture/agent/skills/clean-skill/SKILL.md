@@ -1,6 +1,6 @@
 ---
 name: clean-skill
-description: "Sandbox fixture skill that is intentionally clean: environment invariants only. Control group for false positives in exuvia tests."
+description: "Sandbox fixture skill that is intentionally clean: environment invariants only. Control group for false positives in hiviz tests."
 ---
 
 # Release checklist (this machine)

@@ -42,8 +42,6 @@ For every inventoried file compute:
 
 ## Phase 3 — Report and decisions file (funnel format)
 
-If a legacy `.exuvia/` dir exists in the project, READ its facts/report history and WRITE everything to `.hiviz/` from now on (one-time migration; engines fall back automatically).
-
 Write `.hiviz/report-<YYYYMMDD-HHMM>.md` (versioned — NEVER overwrite a previous report: the versioned series is the prompt-debt history) and refresh `.hiviz/report.md` as a copy of the newest one (latest-pointer for existing links and tools).
 
 **Format contract (binding):**

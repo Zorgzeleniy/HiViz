@@ -6,7 +6,6 @@
 
 **Your agent's instruction files (`CLAUDE.md`, `AGENTS.md`, skills, MCP configs) rot. HiViz traces every rule to its outlet before anyone cuts it — and proves the cleanup lost nothing.**
 
-<sub>formerly **exuvia** — same engines, same invariants, new vest</sub>
 
 <a href="https://www.npmjs.com/package/hiviz"><img src="https://img.shields.io/npm/v/hiviz?style=flat-square&color=orange&label=npm" alt="hiviz on npm"></a>
 <a href="https://github.com/Zorgzeleniy/hiviz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT"></a>
@@ -22,7 +21,7 @@
 
 <div align="center">
 
-**[See it](#-see-it) · [Quick Start](#-quick-start) · [What it catches](#-what-it-catches) · [The Numbers](#-the-numbers) · [Commands](#commands) · [What it never does](#-what-it-never-does) · [Glossary](#-words-we-use) · [License](#-license)**
+**[See it](#-see-it) · [Quick Start](#-quick-start) · [What it catches](#-what-it-catches) · [The Numbers](#-the-numbers) · [Commands](#commands) · [What it never does](#-what-it-never-does) · [License](#-license)**
 
 </div>
 
@@ -209,14 +208,29 @@ npx hiviz init
 
 ## 📊 The Numbers
 
-From this repo — pilot scale (4 tasks × 5 repeats × 2 arms, one model), so read the deltas as a pattern, not a coefficient. The A/B rows are reproducible with `python bench/run_ab.py` (LLM, ~30 min); the suite is `python tests/run.py --t1` (free, seconds) and `--t2` (LLM, ~20 min).
+Pilot scale (4 tasks × 5 repeats × 2 arms, one model) — read the deltas as a pattern, not a coefficient. Reproduce: `python bench/run_ab.py` (LLM, ~30 min) · `python tests/run.py --t1` (free, seconds). One block ≈ 4% cost change; the cleaned arm is arm B.
+
+```
+cost delta per task — cleaned corpus vs bloated arm
+
+popular config (41.6k★ CLAUDE.md + 23 skills)        single file (julep AGENTS.md 19.3k→4.3k, no skills)
+bugfix       ███████ −29%                            bugfix       ████ −14%
+cli-todo     ████████ −33%                           cli-todo     ██ −8%
+qa           █ −4%                                   qa           █ −3%
+conventions  ███ +12%                               conventions  ████████████████████ +80%
+
+▲ negative = cheaper · the conventions bar grows on purpose: after cleanup the rules
+  actually bind, and the agent spends turns obeying them (grounding +23% / +10%)
+quality: 100% in both arms on every task, both configs
+```
+The conventions bar is the product thesis upside-down: a cleaned corpus makes rules bind, and binding costs turns. Full tables: [popular](./bench/runs/20260924-174948/results.md) · [single-file](./bench/runs/20260924-190543/results.md) · [rules-inventory](./bench/rules_inventory.py)
+
 
 | What | Measured on | Result |
 |---|---|---|
-| **Real-world cleanup** (maintainer's own harness) | AGENTS.md + skills + MCP | AGENTS.md −65% · 17 low-quality skills removed · MCP surface 4.0k → 2.4k tokens/session |
-| **A/B shed-bench · popular config** | 41.6k★ CLAUDE.md + 23 skills incl. 2 viral · 4 deterministic tasks × 5 repeats × 2 arms, same model | cost **−33%** first coding task · **−29%** bugfix · qa −4% · conventions **+12% cost → +23% grounding**: hard rules 100% in both arms, but rules that drowned in the bloat (`venv`, `ephemeral links`) surface only post-cleanup · [table](./bench/runs/20260924-174948/results.md) · [inventory](./bench/rules_inventory.py) |
-| **A/B shed-bench · single file, no skills** | julep `AGENTS.md` 19,342 → 4,288 B (the See-it demo above) · same protocol | cost **−14%** bugfix · −8% coding task · qa −3% · conventions **+80% cost → +10% grounding** — same pattern on a second corpus · [table](./bench/runs/20260924-190543/results.md) |
 | **Translator roundtrip** | omp → neutral intermediate format → omp, probe-checked | first run **caught a line genuinely lost in migration** (2/3 → FAIL); after the fix, 3/3 green |
+
+<sub>A private case, not a benchmark — the maintainer's own desk after one cleanup: AGENTS.md −65% (3,362 → 1,180 B) · 17 low-quality skills removed · MCP surface 6 servers → 2, i.e. 4.0k → 2.4k tokens/session.</sub>
 
 ---
 
@@ -259,22 +273,6 @@ The five invariants are the product. Breaking any of them is a semver-major deci
 3. **Never edits without a `.bak-<date>` backup** next to the file.
 4. **Never adds anything of its own.** Apply performs exactly the approved decisions, word for word.
 5. **Never claims a rule survived without a probe.** Verification = a fresh headless session quoting the rule.
-
----
-
-## 📖 Words we use
-
-| Term | Plain meaning |
-|---|---|
-| **HiViz** | the vest you wear so nobody cuts a live wire by accident — and *viz.* ("namely"): this rule is alive, that one is dead. Every decision leaves a tag and a drawer entry. |
-| **probe** | a background agent session asked to quote one rule — if it quotes, the rule is alive |
-| **AGENTS.md / CLAUDE.md** | the file where your agent's standing instructions live; same role, different tool names |
-| **harness** | the agent tool itself (Claude Code, Codex, Cursor, Windsurf, omp, OpenCode) |
-| **instruction corpus** | all your standing instructions together: CLAUDE.md/AGENTS.md, skills, subagent prompts, MCP tool descriptions |
-| **drift** | a standing instruction that no longer matches the actual machine (path moved, tool updated, port closed) |
-| **ledger** | a local change log hiviz keeps: who wrote/changed which line, when, and why |
-| **omp** | Oh My Pi — an open-source terminal coding agent, one of the five supported tools |
-| **headless session** | an agent run with no interactive chat — a question in, an answer out, used for probes |
 
 ---
 
