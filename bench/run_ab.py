@@ -20,7 +20,7 @@ from statistics import median
 BENCH = Path(__file__).resolve().parent
 REPO = BENCH.parent
 HOME = Path.home()
-TASKS = ["cli-todo", "bugfix", "conventions", "qa"]
+TASKS = ["real-jwt", "cli-todo", "bugfix", "conventions", "qa"]
 
 
 def sh(cmd: list[str], cwd=None, timeout=2400, env=None):

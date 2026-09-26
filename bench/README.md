@@ -25,6 +25,7 @@ aggregate medians → table (md + html view via render/report.py)
 | `cli-todo` | build `todo.py` (add/list/done/remove, todo.json) | drives the CLI end-to-end, checks storage |
 | `bugfix` | fix a planted off-by-one in `calc.py` | hidden assertions incl. edge cases + API signature preserved |
 | `conventions` | create `NOTES.md` + `COMMIT_MSG.txt` following the corpus's own hard rules | regex/format checks **derived from the config itself** (measures binding of kept rules) |
+| `real-jwt` | implement a PyJWT-compatible JWT subset (single `jwt.py`, HS256, full claim/exception taxonomy) | 10 checks **ported from pyjwt 2.10.1's real test suite** (canonical interop token, leeway, aud/iss, alg-confusion); site-packages stripped so an installed PyJWT cannot satisfy it |
 | `qa` | answer 5 questions whose answers live in the corpus | substring markers |
 
 `conventions` and `qa` are authored per-config against its real content (bench/configs/<name>/meta). This is the manual labeling step, done once per config at freeze time.
