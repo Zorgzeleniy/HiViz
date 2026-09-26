@@ -20,7 +20,7 @@ from statistics import median
 BENCH = Path(__file__).resolve().parent
 REPO = BENCH.parent
 HOME = Path.home()
-TASKS = ["real-jwt", "cli-todo", "bugfix", "conventions", "qa"]
+TASKS = ["real-jwt", "bug-hunt"]
 
 
 def sh(cmd: list[str], cwd=None, timeout=2400, env=None):
@@ -59,7 +59,10 @@ def seed_workdir(task: str, wd: Path) -> None:
     fx = BENCH / "tasks" / task / "fixtures"
     if fx.exists():
         for f in fx.iterdir():
-            shutil.copy2(f, wd / f.name)
+            if f.is_dir():
+                shutil.copytree(f, wd / f.name, dirs_exist_ok=True)
+            else:
+                shutil.copy2(f, wd / f.name)
 
 
 def verify(task: str, wd: Path, config_dir: Path) -> tuple[bool, str, float]:
