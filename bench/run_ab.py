@@ -81,11 +81,12 @@ def verify(task: str, wd: Path, config_dir: Path) -> tuple[bool, str, float]:
 def parse_json_metrics(jsonl: str) -> dict:
     """Extract aggregated usage from omp --mode=json output.
     input_tokens is TOTAL input seen by the model: fresh input + cache reads.
-    Providers that report zero usage (e.g. local proxies) fall back to a
-    chars/4 estimate over the transcript; tokens_approx flags that."""
+    A run where ANY turn reports zero usage (local proxies) is estimated
+    CONSISTENTLY from the transcript (chars/4) — never a real/estimated mix."""
     m = {"input_tokens": 0, "output_tokens": 0, "cache_read": 0,
          "cost_total": 0.0, "turns": 0, "tokens_approx": False}
-    seen_chars = 0  # cumulative transcript chars before the current turn
+    turns = []  # (prior_chars, out_chars, usage)
+    seen_chars = 0
     for line in jsonl.splitlines():
         line = line.strip()
         if not line:
@@ -97,30 +98,28 @@ def parse_json_metrics(jsonl: str) -> dict:
         if d.get("type") not in ("message_start", "message_end"):
             continue
         msg = d.get("message") or {}
+        parts = (msg.get("content") or []) if isinstance(msg.get("content"), list) else []
+        text_len = sum(len(p.get("text", "")) for p in parts if isinstance(p, dict))
         if msg.get("role") != "assistant":
-            for part in (msg.get("content") or []):
-                if isinstance(part, dict) and isinstance(part.get("text"), str):
-                    seen_chars += len(part["text"])
+            seen_chars += text_len
             continue
         if d.get("type") == "message_end":
-            m["turns"] += 1
             u = msg.get("usage") or {}
-            in_real = u.get("input", 0) + u.get("cacheRead", 0)
-            out_real = u.get("output", 0)
-            if in_real or out_real:
-                m["input_tokens"] += in_real
-                m["output_tokens"] += out_real
-                m["cache_read"] += u.get("cacheRead", 0)
-                m["cost_total"] += (u.get("cost") or {}).get("total", 0.0)
-            else:
-                out_chars = sum(len(p.get("text", "")) for p in (msg.get("content") or [])
-                                if isinstance(p, dict))
-                m["input_tokens"] += seen_chars // 4
-                m["output_tokens"] += out_chars // 4
-                m["tokens_approx"] = True
-            for part in (msg.get("content") or []):
-                if isinstance(part, dict) and isinstance(part.get("text"), str):
-                    seen_chars += len(part["text"])
+            turns.append((seen_chars, text_len, u))
+        seen_chars += text_len
+    m["turns"] = len(turns)
+    if turns and all((u.get("input", 0) + u.get("cacheRead", 0) + u.get("output", 0)) > 0
+                     for _, _, u in turns):
+        for _, _, u in turns:
+            m["input_tokens"] += u.get("input", 0) + u.get("cacheRead", 0)
+            m["output_tokens"] += u.get("output", 0)
+            m["cache_read"] += u.get("cacheRead", 0)
+            m["cost_total"] += (u.get("cost") or {}).get("total", 0.0)
+    else:
+        m["tokens_approx"] = True
+        for prior, out_len, _ in turns:
+            m["input_tokens"] += prior // 4
+            m["output_tokens"] += out_len // 4
     return m
 
 
@@ -136,6 +135,7 @@ def run_arm_task(profile: str, task: str, repeat: int, runs_dir: Path, label_dir
     r = sh(["omp", "--profile", profile, "-p", prompt, "--mode=json"], cwd=wd)
     wall = round(time.monotonic() - t0)
     ok, detail, score = verify(task, wd, label_dir)
+    (wd / "omp_transcript.jsonl").write_text(r.stdout or "", encoding="utf-8", errors="replace")
     metrics = parse_json_metrics(r.stdout or "")
     return {"task": task, "rep": repeat, "pass": ok, "detail": detail, "score": score,
             "wall_s": wall, **metrics}
