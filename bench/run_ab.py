@@ -80,9 +80,12 @@ def verify(task: str, wd: Path, config_dir: Path) -> tuple[bool, str, float]:
 
 def parse_json_metrics(jsonl: str) -> dict:
     """Extract aggregated usage from omp --mode=json output.
-    input_tokens is TOTAL input seen by the model: fresh input + cache reads."""
+    input_tokens is TOTAL input seen by the model: fresh input + cache reads.
+    Providers that report zero usage (e.g. local proxies) fall back to a
+    chars/4 estimate over the transcript; tokens_approx flags that."""
     m = {"input_tokens": 0, "output_tokens": 0, "cache_read": 0,
-         "cost_total": 0.0, "turns": 0}
+         "cost_total": 0.0, "turns": 0, "tokens_approx": False}
+    seen_chars = 0  # cumulative transcript chars before the current turn
     for line in jsonl.splitlines():
         line = line.strip()
         if not line:
@@ -91,16 +94,33 @@ def parse_json_metrics(jsonl: str) -> dict:
             d = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if d.get("type") not in ("message_start", "message_end"):
+            continue
+        msg = d.get("message") or {}
+        if msg.get("role") != "assistant":
+            for part in (msg.get("content") or []):
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    seen_chars += len(part["text"])
+            continue
         if d.get("type") == "message_end":
-            msg = d.get("message") or {}
-            if msg.get("role") != "assistant":
-                continue
             m["turns"] += 1
             u = msg.get("usage") or {}
-            m["input_tokens"] += u.get("input", 0) + u.get("cacheRead", 0)
-            m["output_tokens"] += u.get("output", 0)
-            m["cache_read"] += u.get("cacheRead", 0)
-            m["cost_total"] += (u.get("cost") or {}).get("total", 0.0)
+            in_real = u.get("input", 0) + u.get("cacheRead", 0)
+            out_real = u.get("output", 0)
+            if in_real or out_real:
+                m["input_tokens"] += in_real
+                m["output_tokens"] += out_real
+                m["cache_read"] += u.get("cacheRead", 0)
+                m["cost_total"] += (u.get("cost") or {}).get("total", 0.0)
+            else:
+                out_chars = sum(len(p.get("text", "")) for p in (msg.get("content") or [])
+                                if isinstance(p, dict))
+                m["input_tokens"] += seen_chars // 4
+                m["output_tokens"] += out_chars // 4
+                m["tokens_approx"] = True
+            for part in (msg.get("content") or []):
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    seen_chars += len(part["text"])
     return m
 
 
