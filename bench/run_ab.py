@@ -42,6 +42,9 @@ def setup_profile(name: str, corpus: Path, model: str) -> Path:
         for s in sorted(d.iterdir()):
             if s.is_dir() and (s / "SKILL.md").exists():
                 shutil.copytree(s, prof / "skills" / f"{d.name}-{s.name}")
+    src_models = HOME / ".omp" / "agent" / "models.yml"
+    if src_models.exists():
+        shutil.copy2(src_models, prof / "models.yml")   # custom providers must exist in the profile too
     (prof / "config.yml").write_text(
         f"modelRoles:\n  default: {model}\nmemory:\n  backend: local\n"
         f"skills:\n  customDirectories:\n    - {(prof / 'skills').as_posix()}\n",
