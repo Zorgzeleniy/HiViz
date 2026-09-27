@@ -218,7 +218,7 @@ def main() -> int:
     ap.add_argument("--arm-a", required=True)
     ap.add_argument("--arm-b", default=None)
     ap.add_argument("--repeats", type=int, default=5)
-    ap.add_argument("--model", default="zai/glm-5.3-flash:high")
+    ap.add_argument("--model", default="zai/glm-5.3:max")
     ap.add_argument("--tasks", nargs="*", default=TASKS)
     ap.add_argument("--setup-only", action="store_true")
     ap.add_argument("--resume", default=None, help="existing run dir: completed (arm,task,rep) with transcripts are kept")
