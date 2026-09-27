@@ -18,3 +18,7 @@ The upstream fixes were small (a few lines each). Find them by behavior, not by
 reading the changelog — there is none here.
 
 Work strictly in the current directory. No network, no git commits.
+
+## Ground rules (scoring)
+
+Work agentic or score zero: the fixes must exist as FILE edits made by tool calls when the verifier runs. Narrating a diagnosis, planning out loud, or answering in prose without editing the code scores 0. Start by reading and running the code.

@@ -36,3 +36,7 @@ for bad payload types.
 - `decode` accepts `str` or `bytes` tokens.
 
 No external dependencies (stdlib only). No network. One file: `jwt.py`.
+
+## Ground rules (scoring)
+
+Work agentic or score zero: the artifacts (`jwt.py` / fixes in `jwt/`) must exist as FILES created by tool calls when the verifier runs. Narrating a solution, planning out loud, or answering in prose without creating the files scores 0. Start by acting.
