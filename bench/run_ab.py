@@ -135,9 +135,9 @@ def run_arm_task(profile: str, task: str, repeat: int, runs_dir: Path, label_dir
     t0 = time.monotonic()
     r = sh(["omp", "--profile", profile, "-p", prompt, "--mode=json"], cwd=wd)
     wall = round(time.monotonic() - t0)
-    ok, detail = verify(task, wd, label_dir)
+    ok, detail, score = verify(task, wd, label_dir)
     metrics = parse_json_metrics(r.stdout or "")
-    return {"task": task, "rep": repeat, "pass": ok, "detail": detail,
+    return {"task": task, "rep": repeat, "pass": ok, "detail": detail, "score": score,
             "wall_s": wall, **metrics}
 
 
