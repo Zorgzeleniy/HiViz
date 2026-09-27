@@ -140,8 +140,18 @@ def run_arm_task(profile: str, task: str, repeat: int, runs_dir: Path, label_dir
     ok, detail, score = verify(task, wd, label_dir)
     (wd / "omp_transcript.jsonl").write_text(r.stdout or "", encoding="utf-8", errors="replace")
     metrics = parse_json_metrics(r.stdout or "")
-    return {"task": task, "rep": repeat, "pass": ok, "detail": detail, "score": score,
-            "wall_s": wall, **metrics}
+    row = {"task": task, "rep": repeat, "pass": ok, "detail": detail, "score": score,
+           "wall_s": wall, **metrics}
+    (wd / "run_meta.json").write_text(json.dumps(
+        {"task": task, "rep": repeat, "wall_s": wall}), encoding="utf-8")
+    return row
+
+
+def _wall_stats(sub: list[dict]) -> dict:
+    walls = [r["wall_s"] for r in sub if r.get("wall_s") is not None]
+    if not walls:
+        return {"wall_med": None, "wall_min": None, "wall_max": None}
+    return {"wall_med": median(walls), "wall_min": min(walls), "wall_max": max(walls)}
 
 
 def aggregate(rows: list[dict]) -> list[dict]:
@@ -158,9 +168,7 @@ def aggregate(rows: list[dict]) -> list[dict]:
                 "score_med": median(r["score"] for r in sub),
                 "score_min": min(r["score"] for r in sub),
                 "score_max": max(r["score"] for r in sub),
-                "wall_med": median(r["wall_s"] for r in sub),
-                "wall_min": min(r["wall_s"] for r in sub),
-                "wall_max": max(r["wall_s"] for r in sub),
+                **_wall_stats(sub),
                 "tok_in_med": median(r["input_tokens"] for r in sub),
                 "tok_out_med": median(r["output_tokens"] for r in sub),
                 "cache_med": median(r["cache_read"] for r in sub),
@@ -176,10 +184,12 @@ def render_results(agg: list[dict], raw: list[dict]) -> str:
              "| arm | task | pass | score | wall (med) | tok in (incl cache) | tok out | cache | cost $ | turns |",
              "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for a in agg:
+        wall = (f"{a['wall_med']:.0f}s ({a['wall_min']}-{a['wall_max']})"
+                if a['wall_med'] is not None else "n/a")
         lines.append(
             f"| {a['arm']} | {a['task']} | {a['pass_rate']:.0%} | "
             f"{a['score_med']:.1f} ({a['score_min']:.0f}-{a['score_max']:.0f}) | "
-            f"{a['wall_med']:.0f}s ({a['wall_min']}-{a['wall_max']}) | "
+            f"{wall} | "
             f"{a['tok_in_med']:,.0f} | {a['tok_out_med']:,.0f} | "
             f"{a['cache_med']:,.0f} | {a['cost_med']:.4f} | {a['turns_med']:.0f} |")
     # summary deltas
@@ -211,6 +221,7 @@ def main() -> int:
     ap.add_argument("--model", default="zai/glm-5.3-flash:high")
     ap.add_argument("--tasks", nargs="*", default=TASKS)
     ap.add_argument("--setup-only", action="store_true")
+    ap.add_argument("--resume", default=None, help="existing run dir: completed (arm,task,rep) with transcripts are kept")
     a = ap.parse_args()
 
     arms = {"a": a.arm_a}
@@ -231,13 +242,28 @@ def main() -> int:
         print(f"[arm {k}] profile {profiles[k]}: {n} skills, corpus mounted={(prof / 'AGENTS.md').exists()}, model {a.model}")
     if a.setup_only:
         return 0
-    runs_dir = BENCH / "runs" / time.strftime("%Y%m%d-%H%M%S")
+    runs_dir = Path(a.resume) if a.resume else BENCH / "runs" / time.strftime("%Y%m%d-%H%M%S")
     label_dir = config_dirs["a"]   # labeling (qa/conventions/task.md) lives in the baseline arm's config
     rows = []
     for k, prof_name in profiles.items():
         for task in a.tasks:
             for rep in range(1, a.repeats + 1):
-                row = run_arm_task(prof_name, task, rep, runs_dir / f"arm-{k}", label_dir)
+                wd = runs_dir / f"arm-{k}" / task / f"r{rep}"
+                done = wd / "omp_transcript.jsonl"
+                if a.resume and done.exists() and done.stat().st_size > 0:
+                    print(f"  resume arm {k} · {task} · r{rep}: kept (transcript on disk)")
+                    metrics = parse_json_metrics(done.read_text(encoding="utf-8", errors="replace"))
+                    ok, detail, score = verify(task, wd, label_dir)
+                    meta = {}
+                    if (wd / "run_meta.json").exists():
+                        try:
+                            meta = json.loads((wd / "run_meta.json").read_text(encoding="utf-8"))
+                        except json.JSONDecodeError:
+                            pass
+                    row = {"task": task, "rep": rep, "pass": ok, "detail": detail, "score": score,
+                           "wall_s": meta.get("wall_s"), **metrics}
+                else:
+                    row = run_arm_task(prof_name, task, rep, runs_dir / f"arm-{k}", label_dir)
                 row["arm"] = k
                 row["model"] = a.model
                 rows.append(row)
