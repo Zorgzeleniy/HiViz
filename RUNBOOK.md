@@ -7,7 +7,7 @@
 - `meters/` — v0.2: fixed `mcp_footprint` (live MCP context-cost meter) lands here.
 
 ## Conventions
-- English only. All outputs land in `.hiviz/` (legacy `.hiviz/` is read as fallback) inside the audited project.
+- English only. All outputs land in `.hiviz/` inside the audited project.
 - The five invariants (README "What it never does") are the product — any change to them is a semver-major decision.
 - Probes: `claude -p` / `codex exec` / `omp -p` — harness-detected, never hardcoded.
 - drift×mcp (v0.6): check.py auto-loads <base>/.hiviz/mcp_footprint.json when present (or --mcp-footprint); rows mcp:<server>: STALE if tokens>=--mcp-min-tokens (500) AND (calls==0 OR last_used older than --mcp-stale-days 30); meter-error rows → UNVERIFIABLE; missing file → silent skip (no phantom rows). T1 asserts the full merge (6 OK / 3 STALE / 2 UNVERIFIABLE on fixture).

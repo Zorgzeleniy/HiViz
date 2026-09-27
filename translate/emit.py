@@ -39,16 +39,36 @@ KIND_HEADERS = {"safety": "Safety (non-negotiable)", "invariant": "Environment i
 
 
 def load_ir(path: Path) -> tuple[list[dict], list[dict]]:
+    """Invalid entries abort the run: a silently skipped line is a rule lost in migration."""
     kept, dropped = [], []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    problems = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip()
         if not line:
             continue
         try:
             e = json.loads(line)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as ex:
+            problems.append(f"line {n}: invalid JSON ({ex.msg})")
             continue
-        (dropped if e.get("dedup_of") else kept).append(e)
+        if e.get("dedup_of"):
+            dropped.append(e)
+            continue
+        kind = str(e.get("kind", "")).strip().lower()
+        if kind not in KIND_ORDER:
+            problems.append(f"line {n} ({e.get('id', '?')}): kind {e.get('kind')!r} "
+                            f"not one of {'|'.join(KIND_ORDER)}")
+        elif not isinstance(e.get("text"), str) or not e["text"].strip():
+            problems.append(f"line {n} ({e.get('id', '?')}): missing text")
+        else:
+            e["kind"] = kind
+            kept.append(e)
+    if problems:
+        print(f"IR {path}: {len(problems)} invalid entr{'y' if len(problems) == 1 else 'ies'}",
+              file=sys.stderr)
+        for p in problems:
+            print(f"  {p}", file=sys.stderr)
+        sys.exit(2)
     return kept, dropped
 
 

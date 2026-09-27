@@ -2,7 +2,7 @@ tests/out/
 tests/*.state
 tests/**/__pycache__/
 **/__pycache__/
-.exuvia/
+.hiviz/
 *.tmp
 *.bak-*
 tests/results.log

@@ -219,7 +219,7 @@ npx @zorgzeleniy/hiviz init
 
 ## 📊 The Numbers
 
-Pilot scale (4 tasks × 5 repeats × 2 arms, one model) — read the deltas as a pattern, not a coefficient. Reproduce: `python bench/run_ab.py` (LLM, \~30 min) · `python tests/run.py --t1` (free, seconds). One block ≈ 4% cost change; the cleaned arm is arm B.
+Pilot scale (4 tasks × 5 repeats × 2 arms, one model) — read the deltas as a pattern, not a coefficient. These runs used the pilot task set (bugfix · cli-todo · qa · conventions), since replaced by real-project tasks (`real-jwt`, `bug-hunt`) in `e9233c1` — reproduce them from `git checkout e9233c1~1`, then `python bench/run_ab.py` (LLM, \~30 min) · `python tests/run.py --t1` (free, seconds). One block ≈ 4% cost change; the cleaned arm is arm B.
 
 ```
 cost delta per task — cleaned corpus vs bloated arm
@@ -273,10 +273,11 @@ In your project, `.hiviz/`: `report.md` + `decisions.md` (audit), `probes-*.md` 
 After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift gate runs keyless in any CI — zero-config as a GitHub Action:
 
 ```yaml
+- uses: actions/checkout@v4
 - uses: Zorgzeleniy/hiviz@main
 ```
 
-That's the whole step: it installs the engines and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). Constitution probes need a live agent, so those stay a local/agent-CLI concern, not CI.
+That's it: checkout, then the action — it runs the engines straight from the action ref (no npm install) and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). Constitution probes need a live agent, so those stay a local/agent-CLI concern, not CI.
 
 ---
 

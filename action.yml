@@ -6,20 +6,17 @@ branding:
 runs:
   using: "composite"
   steps:
-    - uses: actions/setup-node@v4
-      with:
-        node-version: "20"
     - uses: actions/setup-python@v5
       with:
         python-version: "3.11"
-    - name: install hiviz engines
-      shell: bash
-      run: npx -y hiviz@latest init
     - name: drift check
       shell: bash
+      # engines run straight from the action checkout — pinned to the ref the workflow uses, no npm
+      env:
+        HIVIZ_ENGINES: ${{ github.action_path }}
       run: |
         if [ ! -f .hiviz/facts.toml ]; then
           echo "no .hiviz/facts.toml — run /hv-audit (or ask hiviz to ingest your facts) and commit it. Skipping."
           exit 0
         fi
-        python ~/.hiviz/engines/drift/check.py --facts .hiviz/facts.toml --base .
+        python "$HIVIZ_ENGINES/drift/check.py" --facts .hiviz/facts.toml --base .
