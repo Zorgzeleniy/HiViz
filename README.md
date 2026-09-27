@@ -6,7 +6,7 @@
 
 **Your agent's instruction files (`CLAUDE.md`, `AGENTS.md`, skills, MCP configs) rot. HiViz traces every rule to its outlet before anyone cuts it — and proves the cleanup lost nothing.**
 
-<a href="https://www.npmjs.com/package/hiviz"><img src="https://img.shields.io/npm/v/hiviz?style=flat-square&color=orange&label=npm" alt="hiviz on npm">
+<a href="https://www.npmjs.com/package/@zorgzeleniy/hiviz"><img src="https://img.shields.io/npm/v/@zorgzeleniy/hiviz?style=flat-square&color=orange&label=npm" alt="hiviz on npm">
 
 </a>
 
@@ -22,7 +22,7 @@
 
 <img src="https://img.shields.io/badge/LLM_judgment-optional__and_separated-purple?style=flat-square" alt="human decides">
 
-**One command, no account, no extra API key.** `npx hiviz init` [**→ Quick Start**](#-quick-start)
+**One command, no account, no extra API key.** `npx @zorgzeleniy/hiviz init` [**→ Quick Start**](#-quick-start)
 
 </div>
 
@@ -185,10 +185,10 @@ It starts as a linter. It grows into the history of every rule you approved, tes
 
 Detects every supported agent on your machine, installs the right adapter into each, deploys the python engines to `~/.hiviz/engines`. Safe to re-run.
 
-**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. Changed your mind: `npx hiviz uninstall`. Windows gotchas live in the [RUNBOOK](./RUNBOOK.md).
+**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. Changed your mind: `npx @zorgzeleniy/hiviz uninstall`. Windows gotchas live in the [RUNBOOK](./RUNBOOK.md).
 
 ```bash
-npx hiviz init
+npx @zorgzeleniy/hiviz init
 ```
 
 ### 🕐 The first five minutes

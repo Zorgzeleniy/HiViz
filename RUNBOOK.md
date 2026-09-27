@@ -24,6 +24,6 @@
 - package.json `files` missed drift/constitution/blame; version was 0.1.0 → 0.4.0.
 - omp/Cursor/OpenCode had audit only → omp now installs 4 skills (audit/drift/constitution/blame). README Use = full 5-command table. Installer final message lists everything. .gitignore added.
 - Wording: "Phase 1.5" → "Phase 1, step 5"; MCP disable-candidate phrasing; engines log prefix "=" when nothing changed (idempotency assertion). T1: 7/7 after fixes.
-- npm name availability check (`hiviz`; fallback `hv-sh`), then `npm publish` → `npx hiviz init`.
+- npm name: unscoped `hiviz` blocked by similarity guard (dead `hi-viz` placeholder); published as scoped `@zorgzeleniy/hiviz` (bin stays `hiviz`).
 - Marketplace listing for Claude Code (plugin.json wrapper) — after npm.
 - Translator (v0.5, DONE): `translate/emit.py` (IR jsonl → mechanical placement: omp RULES+AGENTS split, claude/codex single file, cursor flat; dedup_of entries dropped; translation-report.md) + `core/TRANSLATE.md` (harvest→IR→emit→PROVE equivalence with constitution probes→ledger action "migrated") + `/hv-translate` commands (claude/codex) + omp skill; engines deployed. T1-emit 8/8; live roundtrip omp→IR→omp in sandbox hv-t2: first run 2/3 — the FAIL caught a line genuinely missing from my hand-authored IR (language-default), exactly the designed behavior; after adding r7: 3/3 green. That FAIL→fix→green loop IS the product demo.
