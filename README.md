@@ -219,10 +219,25 @@ npx @zorgzeleniy/hiviz init
 
 ## 📊 The Numbers
 
-Pilot scale (4 tasks × 5 repeats × 2 arms, one model) — read the deltas as a pattern, not a coefficient. Reproduce: `python bench/run_ab.py` (LLM, \~30 min) · `python tests/run.py --t1` (free, seconds). One block ≈ 4% cost change; the cleaned arm is arm B.
+Two rounds, same method: an A/B shed-bench where arm A carries the full instruction corpus and arm B the cleaned one. Reproduce: `python bench/run_ab.py` (LLM) · `python tests/run.py --t1` (free, seconds). Negative = cheaper for the cleaned arm B.
 
 ```
-cost delta per task — cleaned corpus vs bloated arm
+ROUND 2 — real tasks, glm-5.3 max effort (48 runs: 4 tasks × 2 configs × 2 arms × n=3)
+tasks ported from real projects: PyJWT suite subset, vendored real historical fixes
+
+bug-hunt     popular ███████ −36%    julep ███ −14%     ← stable, token-heavy turns
+tx-kv        popular ███ −12%        julep ███ −13%     ← reproduced on both configs
+real-jwt     popular ███ −12%        julep +noise*       ← one bloated run skews n=3
+harden       popular +noise*         julep █████ −29%
+
+typical cell −12% · 6 of 8 cells cheaper · block ≈ 5%
+quality: the corpus never won a single cell. Cleaning caused 0 quality regressions.
+  bug-hunt: clean arm hit 8/10 and 7/10 twice; corpus arm flat 6/10 — never passed.
+  tx-kv: both corpus arms dropped a point on the same exact-bytes WAL check; clean 10/10.
+```
+
+```
+ROUND 1 — pilot, glm-5.3-flash (4 tasks × 5 repeats × 2 arms)
 
 popular config (41.6k★ CLAUDE.md + 23 skills)        single file (julep AGENTS.md 19.3k→4.3k, no skills)
 bugfix       ███████ −29%                            bugfix       ████ −14%
@@ -235,13 +250,15 @@ conventions  ███ +12%                                conventions  ██�
 quality: 100% in both arms on every task, both configs
 ```
 
-The conventions bar is the product thesis upside-down: a cleaned corpus makes rules bind, and binding costs turns. Full tables: [popular](./bench/runs/20260924-174948/results.md) · [single-file](./bench/runs/20260924-190543/results.md) · [rules-inventory](./bench/rules_inventory.py)
+The conventions bar is the product thesis upside-down: a cleaned corpus makes rules bind, and binding costs turns.
 
+**A floor, not a ceiling.** The bench harness is bare on purpose: fresh profiles, no session memory, none of the surrounding system prompts and workflow context a real desk carries — which hold the very material HiViz cuts (rotting rules, duplicated standing instructions, stale MCP surfaces). Real setups start from a bigger pile, so the deltas above are a conservative lower bound on what a cleanup saves.
+
+Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/20260927-202620/results.md) · [popular: tx-kv](./bench/runs/20260928-122436/results.md) · [popular: harden](./bench/runs/20260928-113743/results.md) · [julep: jwt/bugfix](./bench/runs/20260927-225617/results.md) · [julep: tx-kv](./bench/runs/20260928-140558/results.md) · [julep: harden](./bench/runs/20260928-115634/results.md) · pilot — [popular](./bench/runs/20260924-174948/results.md) · [single-file](./bench/runs/20260924-190543/results.md) · [rules-inventory](./bench/rules_inventory.py)
 
 | What                     | Measured on                                            | Result                                                                                         |
 | ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | **Translator roundtrip** | omp → neutral intermediate format → omp, probe-checked | first run **caught a line genuinely lost in migration** (2/3 → FAIL); after the fix, 3/3 green |
-
 
 <sub>A private case, not a benchmark — the maintainer's own desk after one cleanup: AGENTS.md −65% (3,362 → 1,180 B) · 17 low-quality skills removed · MCP surface 6 servers → 2, i.e. 4.0k → 2.4k tokens/session.</sub>
 
