@@ -20,7 +20,7 @@ from statistics import median
 BENCH = Path(__file__).resolve().parent
 REPO = BENCH.parent
 HOME = Path.home()
-TASKS = ["real-jwt", "bug-hunt"]
+TASKS = ["harden-client", "bug-hunt"]  # real-jwt archived: saturates 10/10 both arms
 
 
 def sh(cmd: list[str], cwd=None, timeout=2400, env=None):
