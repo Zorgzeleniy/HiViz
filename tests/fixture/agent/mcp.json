@@ -2,7 +2,7 @@
   "mcpServers": {
     "fake-bloated": {
       "type": "stdio",
-      "command": "python",
+      "command": "{{PYTHON}}",
       "args": [
         "tests/fake_mcp_server.py",
         "--tools", "3", "--desc-bytes", "600", "--delay-ms", "200"

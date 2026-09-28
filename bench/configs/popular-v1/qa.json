@@ -1,7 +1,0 @@
-[
- {"n":1,"any_of":["type(scope)"]},
- {"n":2,"any_of":["language","fence"]},
- {"n":3,"any_of":["relative"]},
- {"n":4,"any_of":["commit","push"]},
- {"n":5,"any_of":["Co-Authored-By","co-authored"]}
-]

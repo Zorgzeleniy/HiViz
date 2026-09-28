@@ -16,7 +16,7 @@ check = { type = "dir_glob", glob = "agent/skills/*/SKILL.md" }
 
 [facts.python-available]
 description = "python runtime available for meters/drift engines"
-check = { type = "shell", cmd = "python --version" }
+check = { type = "shell", cmd = "python3 --version || python --version" }
 
 [facts.legacy-runner-doc]
 description = "legacy runner note still referenced"

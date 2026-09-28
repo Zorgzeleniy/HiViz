@@ -62,7 +62,11 @@ def t1() -> None:
           eng.read_text(encoding="utf-8") == (REPO / "core/AUDIT.md").read_text(encoding="utf-8"),
           str(eng) if eng.exists() else "~/.hiviz/engines missing")
 
-    r = sh(["python", "meters/mcp_footprint.py", "--config", "tests/fixture/agent/mcp.json",
+    mcp_cfg = OUT / "mcp_rendered.json"
+    _mcp = json.loads((REPO / "tests/fixture/agent/mcp.json").read_text(encoding="utf-8"))
+    _mcp["mcpServers"]["fake-bloated"]["command"] = sys.executable
+    mcp_cfg.write_text(json.dumps(_mcp), encoding="utf-8")
+    r = sh([sys.executable, "meters/mcp_footprint.py", "--config", str(mcp_cfg),
             "--sessions", "tests/fixture/blame/sessions",
             "--out", "tests/out/fake_mcp.json"])
     ok = r.returncode == 0
@@ -79,7 +83,7 @@ def t1() -> None:
               f"tools={row.get('tools')} bytes={row.get('bytes')} tokens={row.get('tokens')} "
               f"calls={row.get('calls')} last={row.get('last_used')}")
 
-    d = sh(["python", "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml",
+    d = sh([sys.executable, "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml",
             "--base", "tests/fixture",
             "--mcp-footprint", "tests/fixture/hiviz/mcp_footprint.json",
             "--out", "tests/out/drift.json"])
@@ -96,8 +100,8 @@ def t1() -> None:
     check("drift: planted statuses + MCP pay-vs-use detected", d_ok, detail)
 
     (REPO / "tests/fake_harness.py").with_suffix(".state").unlink(missing_ok=True)
-    c = sh(["python", "constitution/run.py", "--tests", "tests/const_fixture",
-           "--harness", 'python tests/fake_harness.py "{ask}"',
+    c = sh([sys.executable, "constitution/run.py", "--tests", "tests/const_fixture",
+           "--harness", sys.executable + ' tests/fake_harness.py "{ask}"',
            "--corpus", "tests/fixture", "--out", "tests/out/constitution.json"])
     c_ok = c.returncode == 1
     cdetail = (c.stderr or "")[-140:]
@@ -124,7 +128,7 @@ def t1() -> None:
                    .read_text(encoding="utf-8").splitlines(), 1) if "10.0.0.42" in l)
     b_out = []
     for sel in (["--marker", "10.0.0.42"], ["--line", str(gw_line)]):
-        b = sh(["python", "blame/blame.py", "--file", "tests/fixture/agent/AGENTS.md", *sel,
+        b = sh([sys.executable, "blame/blame.py", "--file", "tests/fixture/agent/AGENTS.md", *sel,
                 "--sessions", str(bdir / "sessions"), "--ledger", str(bdir / "ledger.jsonl"),
                 "--constitution", str(bdir / "constitution.json")])
         b_out.append(b.stdout or "" if b.returncode == 0 else "")
@@ -135,8 +139,8 @@ def t1() -> None:
 
     for sub in ["tr-omp", "tr-claude"]:
         shutil.rmtree(OUT / sub, ignore_errors=True)
-    e1 = sh(["python", "translate/emit.py", "--ir", "tests/fixture/ir.jsonl", "--target", "omp", "--out", "tests/out/tr-omp"])
-    e2 = sh(["python", "translate/emit.py", "--ir", "tests/fixture/ir.jsonl", "--target", "claude", "--out", "tests/out/tr-claude"])
+    e1 = sh([sys.executable, "translate/emit.py", "--ir", "tests/fixture/ir.jsonl", "--target", "omp", "--out", "tests/out/tr-omp"])
+    e2 = sh([sys.executable, "translate/emit.py", "--ir", "tests/fixture/ir.jsonl", "--target", "claude", "--out", "tests/out/tr-claude"])
     tr_ok = e1.returncode == 0 and e2.returncode == 0
     if tr_ok:
         r_txt = (OUT / "tr-omp/RULES.md").read_text(encoding="utf-8")
@@ -292,6 +296,7 @@ def summary() -> int:
 
 
 def main() -> int:
+    OUT.mkdir(parents=True, exist_ok=True)
     ap = argparse.ArgumentParser()
     ap.add_argument("--t1", action="store_true")
     ap.add_argument("--t2", action="store_true")

@@ -111,7 +111,7 @@ poe test      # ward test --exclude .venv (pytest for integrations-service)
 
 Every golden rule, every safety gate, every working command, the TypeSpec and ward specifics, the AIDEV ritual — all still there, deduplicated.
 
-**19,342 → 4,288 bytes (−78%).** This very file then ran as an arm in the [A/B benchmark](#-the-numbers): quality 100% in both arms, cost −14% on the bugfix task, −8% on the coding task — and +80% on the conventions task, because after the cleanup the rules actually bind and the agent works them properly.
+**19,342 → 4,288 bytes (−78%).** This very file then ran as the corpus arm in the [A/B benchmark](#-the-numbers) — real tasks, max effort, n=3: the cleaned arm cost **−13% to −29%** on three of four tasks (tx-kv, hardening, bug-hunt) and quality never dropped. On the fourth (a long synthesis task) the delta drowned in one bloated run — noise, not signal. And the corpus arm lost points the clean arm kept: twice it dropped the same exact-bytes format check that minimalism-flavored rules invite you to rush.
 
 ```
 P1 generated   → alive — "Never manually edit generated files (`autogen/`) — they get overwritten" quoted
@@ -219,29 +219,30 @@ npx @zorgzeleniy/hiviz init
 
 ## 📊 The Numbers
 
-Pilot scale (4 tasks × 5 repeats × 2 arms, one model) — read the deltas as a pattern, not a coefficient. These runs used the pilot task set (bugfix · cli-todo · qa · conventions), since replaced by real-project tasks (`real-jwt`, `bug-hunt`) in `e9233c1` — reproduce them from `git checkout e9233c1~1`, then `python bench/run_ab.py` (LLM, \~30 min) · `python tests/run.py --t1` (free, seconds). One block ≈ 4% cost change; the cleaned arm is arm B.
+An A/B shed-bench where arm A carries the full instruction corpus and arm B the cleaned one. Reproduce: `python bench/run_ab.py` (LLM) · `python tests/run.py --t1` (free, seconds). Negative = cheaper for the cleaned arm B.
 
 ```
-cost delta per task — cleaned corpus vs bloated arm
+real tasks, glm-5.3 max effort (48 runs: 4 tasks × 2 configs × 2 arms × n=3)
+tasks ported from real projects: PyJWT suite subset, vendored real historical fixes
 
-popular config (41.6k★ CLAUDE.md + 23 skills)        single file (julep AGENTS.md 19.3k→4.3k, no skills)
-bugfix       ███████ −29%                            bugfix       ████ −14%
-cli-todo     ████████ −33%                           cli-todo     ██ −8%
-qa           █ −4%                                   qa           █ −3%
-conventions  ███ +12%                                conventions  ████████████████████ +80%
+bug-hunt     popular ███████ −36%    julep ███ −14%     ← stable, token-heavy turns
+tx-kv        popular ███ −12%        julep ███ −13%     ← reproduced on both configs
+real-jwt     popular ███ −12%        julep +noise*       ← one bloated run skews n=3
+harden       popular +noise*         julep █████ −29%
 
-▲ negative = cheaper · the conventions bar grows on purpose: after cleanup the rules
-  actually bind, and the agent spends turns obeying them (grounding +23% / +10%)
-quality: 100% in both arms on every task, both configs
+typical cell −12% · 6 of 8 cells cheaper · block ≈ 5%
+quality: the corpus never won a single cell. Cleaning caused 0 quality regressions.
+  bug-hunt: clean arm hit 8/10 and 7/10 twice; corpus arm flat 6/10 — never passed.
+  tx-kv: both corpus arms dropped a point on the same exact-bytes WAL check; clean 10/10.
 ```
 
-The conventions bar is the product thesis upside-down: a cleaned corpus makes rules bind, and binding costs turns. Full tables: [popular](./bench/runs/20260924-174948/results.md) · [single-file](./bench/runs/20260924-190543/results.md) · [rules-inventory](./bench/rules_inventory.py)
+**A floor, not a ceiling.** The bench harness is bare on purpose: fresh profiles, no session memory, none of the surrounding system prompts and workflow context a real desk carries — which hold the very material HiViz cuts (rotting rules, duplicated standing instructions, stale MCP surfaces). Real setups start from a bigger pile, so the deltas above are a conservative lower bound on what a cleanup saves.
 
+Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/20260927-202620/results.md) · [popular: tx-kv](./bench/runs/20260928-122436/results.md) · [popular: harden](./bench/runs/20260928-113743/results.md) · [julep: jwt/bugfix](./bench/runs/20260927-225617/results.md) · [julep: tx-kv](./bench/runs/20260928-140558/results.md) · [julep: harden](./bench/runs/20260928-115634/results.md)
 
 | What                     | Measured on                                            | Result                                                                                         |
 | ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | **Translator roundtrip** | omp → neutral intermediate format → omp, probe-checked | first run **caught a line genuinely lost in migration** (2/3 → FAIL); after the fix, 3/3 green |
-
 
 <sub>A private case, not a benchmark — the maintainer's own desk after one cleanup: AGENTS.md −65% (3,362 → 1,180 B) · 17 low-quality skills removed · MCP surface 6 servers → 2, i.e. 4.0k → 2.4k tokens/session.</sub>
 
