@@ -43,17 +43,17 @@ def sh(cmd: list[str], timeout: int = 120, **kw) -> subprocess.CompletedProcess:
 def t1() -> None:
     print("== T1: deterministic ==")
 
+    first = sh(["node", "bin/hiviz.js", "init"])
+    second = sh(["node", "bin/hiviz.js", "init"])
+    check("installer idempotent", first.returncode == 0 and second.returncode == 0
+          and " + " not in second.stdout, "second run adds nothing")
+
     installed = [HOME / ".claude/skills/hv-audit/SKILL.md",
                  HOME / ".omp/agent/skills/hv-audit/SKILL.md"]
     installed = [p for p in installed if p.exists()]
     bad = [str(p) for p in installed if "{{" in p.read_text(encoding="utf-8")]
     check("adapters rendered (no placeholders)", bool(installed) and not bad,
           f"{len(installed)} adapters" + (f", unrendered: {bad}" if bad else ""))
-
-    first = sh(["node", "bin/hiviz.js", "init"])
-    second = sh(["node", "bin/hiviz.js", "init"])
-    check("installer idempotent", first.returncode == 0 and second.returncode == 0
-          and " + " not in second.stdout, "second run adds nothing")
     eng = HOME / ".hiviz/engines/core/AUDIT.md"
     check("installer deploys engines", eng.exists() and
           eng.read_text(encoding="utf-8") == (REPO / "core/AUDIT.md").read_text(encoding="utf-8"),
