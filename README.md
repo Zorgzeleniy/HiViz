@@ -111,7 +111,7 @@ poe test      # ward test --exclude .venv (pytest for integrations-service)
 
 Every golden rule, every safety gate, every working command, the TypeSpec and ward specifics, the AIDEV ritual — all still there, deduplicated.
 
-**19,342 → 4,288 bytes (−78%).** This very file then ran as an arm in the [A/B benchmark](#-the-numbers): quality 100% in both arms, cost −14% on the bugfix task, −8% on the coding task — and +80% on the conventions task, because after the cleanup the rules actually bind and the agent works them properly.
+**19,342 → 4,288 bytes (−78%).** This very file then ran as the corpus arm in the [A/B benchmark](#-the-numbers) — real tasks, max effort, n=3: the cleaned arm cost **−13% to −29%** on three of four tasks (tx-kv, hardening, bug-hunt) and quality never dropped. On the fourth (a long synthesis task) the delta drowned in one bloated run — noise, not signal. And the corpus arm lost points the clean arm kept: twice it dropped the same exact-bytes format check that minimalism-flavored rules invite you to rush.
 
 ```
 P1 generated   → alive — "Never manually edit generated files (`autogen/`) — they get overwritten" quoted
