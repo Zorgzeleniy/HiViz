@@ -1,2 +1,2 @@
-{"file": "D:/Ai/exuvia/tests/fixture/agent/AGENTS.md", "marker": "10.0.0.42", "written_at": "2026-09-01T10:00:05Z", "model": "zai/glm-test-model", "reason": "fixture plant", "action": "added"}
-{"file": "D:/Ai/exuvia/tests/fixture/agent/RULES.md", "marker": "redact", "written_at": "2026-09-01T09:00:00Z", "model": "x", "reason": "safety", "action": "kept"}
+{"file": "{{REPO}}/tests/fixture/agent/AGENTS.md", "marker": "10.0.0.42", "written_at": "2026-09-01T10:00:05Z", "model": "zai/glm-test-model", "reason": "fixture plant", "action": "added"}
+{"file": "{{REPO}}/tests/fixture/agent/RULES.md", "marker": "redact", "written_at": "2026-09-01T09:00:00Z", "model": "x", "reason": "safety", "action": "kept"}
