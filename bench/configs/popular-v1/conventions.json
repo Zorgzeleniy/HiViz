@@ -1,5 +1,0 @@
-{
- "commit_regex": "^(feat|fix|docs|chore|refactor|test)\\([a-zA-Z0-9_-]+\\): \\S.+",
- "file_rules": ["eof_newline", "no_trailing_ws", "fences_declare_language"],
- "must_mention": "type(scope): subject"
-}

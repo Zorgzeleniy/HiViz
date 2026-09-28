@@ -219,10 +219,10 @@ npx @zorgzeleniy/hiviz init
 
 ## 📊 The Numbers
 
-Two rounds, same method: an A/B shed-bench where arm A carries the full instruction corpus and arm B the cleaned one. Reproduce: `python bench/run_ab.py` (LLM) · `python tests/run.py --t1` (free, seconds). Negative = cheaper for the cleaned arm B.
+An A/B shed-bench where arm A carries the full instruction corpus and arm B the cleaned one. Reproduce: `python bench/run_ab.py` (LLM) · `python tests/run.py --t1` (free, seconds). Negative = cheaper for the cleaned arm B.
 
 ```
-ROUND 2 — real tasks, glm-5.3 max effort (48 runs: 4 tasks × 2 configs × 2 arms × n=3)
+real tasks, glm-5.3 max effort (48 runs: 4 tasks × 2 configs × 2 arms × n=3)
 tasks ported from real projects: PyJWT suite subset, vendored real historical fixes
 
 bug-hunt     popular ███████ −36%    julep ███ −14%     ← stable, token-heavy turns
@@ -236,25 +236,9 @@ quality: the corpus never won a single cell. Cleaning caused 0 quality regressio
   tx-kv: both corpus arms dropped a point on the same exact-bytes WAL check; clean 10/10.
 ```
 
-```
-ROUND 1 — pilot, glm-5.3-flash (4 tasks × 5 repeats × 2 arms)
-
-popular config (41.6k★ CLAUDE.md + 23 skills)        single file (julep AGENTS.md 19.3k→4.3k, no skills)
-bugfix       ███████ −29%                            bugfix       ████ −14%
-cli-todo     ████████ −33%                           cli-todo     ██ −8%
-qa           █ −4%                                   qa           █ −3%
-conventions  ███ +12%                                conventions  ████████████████████ +80%
-
-▲ negative = cheaper · the conventions bar grows on purpose: after cleanup the rules
-  actually bind, and the agent spends turns obeying them (grounding +23% / +10%)
-quality: 100% in both arms on every task, both configs
-```
-
-The conventions bar is the product thesis upside-down: a cleaned corpus makes rules bind, and binding costs turns.
-
 **A floor, not a ceiling.** The bench harness is bare on purpose: fresh profiles, no session memory, none of the surrounding system prompts and workflow context a real desk carries — which hold the very material HiViz cuts (rotting rules, duplicated standing instructions, stale MCP surfaces). Real setups start from a bigger pile, so the deltas above are a conservative lower bound on what a cleanup saves.
 
-Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/20260927-202620/results.md) · [popular: tx-kv](./bench/runs/20260928-122436/results.md) · [popular: harden](./bench/runs/20260928-113743/results.md) · [julep: jwt/bugfix](./bench/runs/20260927-225617/results.md) · [julep: tx-kv](./bench/runs/20260928-140558/results.md) · [julep: harden](./bench/runs/20260928-115634/results.md) · pilot — [popular](./bench/runs/20260924-174948/results.md) · [single-file](./bench/runs/20260924-190543/results.md) · [rules-inventory](./bench/rules_inventory.py)
+Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/20260927-202620/results.md) · [popular: tx-kv](./bench/runs/20260928-122436/results.md) · [popular: harden](./bench/runs/20260928-113743/results.md) · [julep: jwt/bugfix](./bench/runs/20260927-225617/results.md) · [julep: tx-kv](./bench/runs/20260928-140558/results.md) · [julep: harden](./bench/runs/20260928-115634/results.md)
 
 | What                     | Measured on                                            | Result                                                                                         |
 | ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
