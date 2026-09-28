@@ -290,6 +290,7 @@ def summary() -> int:
 
 
 def main() -> int:
+    OUT.mkdir(parents=True, exist_ok=True)
     ap = argparse.ArgumentParser()
     ap.add_argument("--t1", action="store_true")
     ap.add_argument("--t2", action="store_true")
