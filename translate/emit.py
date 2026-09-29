@@ -89,9 +89,11 @@ def check(kept: list[dict], target: str, live: Path, name: str) -> int:
             print(f"OK       {fname}")
             continue
         a_lines = set(actual.splitlines())
+        e_lines = set(expected.splitlines())
         missing = [l for l in expected.splitlines() if l not in a_lines and l.strip()]
-        extra = [l for l in actual.splitlines() if l not in set(expected.splitlines()) and l.strip()]
-        ids = [e["id"] for e in kept if e["text"].rstrip() in "\n".join(missing)]
+        extra = [l for l in actual.splitlines() if l not in e_lines and l.strip()]
+        missing_text = "\n".join(missing)
+        ids = [e["id"] for e in kept if e["text"].rstrip() in missing_text]
         hint = f"rules lost: {', '.join(ids)}" if ids else "content drift"
         print(f"DIVERGED {fname}: {len(missing)} expected line(s) missing, "
               f"{len(extra)} unexpected ({hint})")

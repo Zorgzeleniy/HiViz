@@ -34,4 +34,4 @@ print("  AGENTS.md:", len(ag), "bytes | planted smells:",
       sum(m in ag for m in ["best practices", "Be careful", "2026-01-15", "git stash", "10.0.0.42"]), "/5")
 print("  skills:", len(list((run.PROFILE / "skills").glob("*/"))),
       "| auth: ok | model: glm-5.3-flash:high")
-print("\nStart playing:  cd D:/Ai/hiviz && omp --profile hiviz-test")
+print(f"\nStart playing:  cd {REPO} && omp --profile hiviz-test")

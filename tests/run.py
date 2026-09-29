@@ -197,6 +197,7 @@ Probes (pre-authorized, headless `omp --profile hiviz-test -p "<ask>"`; save ans
 def t2() -> None:
     print("== T2: E2E on sandbox profile ==")
     OUT.mkdir(parents=True, exist_ok=True)
+    o = OUT.as_posix()
     profile_setup()
     if not os.environ.get("ZAI_API_KEY"):
         # consistent online snapshot of the default profile's stored login (live db → use backup API)
@@ -217,9 +218,9 @@ def t2() -> None:
     audit_prompt = (
         "Use the hv-audit skill. Audit ONLY these instruction surfaces:\n"
         + "\n".join(str(p) for p in surfaces)
-        + "\nWrite D:/Ai/hiviz/tests/out/report.md INCREMENTALLY — append each phase's table as soon as "
+        + f"\nWrite {o}/report.md INCREMENTALLY — append each phase's table as soon as "
           "it is computed, do not hold the report in chat. Also write the decisions template to "
-          "D:/Ai/hiviz/tests/out/decisions.md (DECISION column empty). Do NOT modify any audited file. "
+          f"{o}/decisions.md (DECISION column empty). Do NOT modify any audited file. "
           "Your final chat reply: one summary line only. English.")
     report = OUT / "report.md"
     reuse = os.environ.get("EXUVIA_REUSE") == "1"
@@ -242,14 +243,14 @@ def t2() -> None:
     fx_files = {str(p): _h(p) for root in ["tests/fixture/agent", "tests/fixture/vendor"]
                 for p in (REPO / root).rglob("*") if p.is_file()}
     (OUT / "decisions.md").write_text(
-        DECISIONS.format(P=str(PROFILE).replace("\\", "/"), O=str(OUT).replace("\\", "/")),
+        DECISIONS.format(P=PROFILE.as_posix(), O=o),
         encoding="utf-8")
     apply_prompt = (
-        "Use the hv-apply procedure. The decisions file is D:/Ai/hiviz/tests/out/decisions.md — "
+        f"Use the hv-apply procedure. The decisions file is {o}/decisions.md — "
         "it is complete and final; apply exactly its rows, nothing else. "
         "Back up every edited file (.bak-<date>). The two probes at the bottom are pre-authorized: "
-        "run them before and after the edits and save answers to D:/Ai/hiviz/tests/out/probes-before.md "
-        "and D:/Ai/hiviz/tests/out/probes-after.md (headless `omp --profile hiviz-test -p \"<ask>\"`). "
+        f"run them before and after the edits and save answers to {o}/probes-before.md "
+        f"and {o}/probes-after.md (headless `omp --profile hiviz-test -p \"<ask>\"`). "
         "ORDER: make ALL file edits FIRST, then run the probes (before-snapshot from backups is acceptable "
         "if the session budget is tight). Do not commit. English.")
     r = sh(["omp", "--profile", "hiviz-test", "-p", apply_prompt], timeout=2400)
