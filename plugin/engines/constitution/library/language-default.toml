@@ -1,0 +1,6 @@
+id = "language-default"
+severity = "normal"
+guards = "RULES.md: default answer language"
+ask = "Without extra text: quote your directive about the default answer language."
+must_include_any = ["English", "русск"]
+must_not_match = []

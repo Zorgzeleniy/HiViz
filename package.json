@@ -28,6 +28,7 @@
     "blame/",
     "translate/",
     "render/",
+    "plugin/",
     "README.md",
     "LICENSE"
   ],
@@ -46,6 +47,12 @@
     "drift",
     "translator",
     "context-engineering",
-    "hiviz"
-  ]
+    "hiviz",
+    "pi-package"
+  ],
+  "pi": {
+    "skills": [
+      "./plugin/skills"
+    ]
+  }
 }

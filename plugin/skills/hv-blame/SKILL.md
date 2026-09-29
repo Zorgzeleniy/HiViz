@@ -1,3 +1,8 @@
+---
+name: hv-blame
+description: "Provenance for instruction lines: when written, by which model, in which session, why (ledger), still verified (constitution). Mines harness session logs for edit/write history. Triggers on: who wrote this rule, why does this line exist, instruction history, 'откуда эта строка'."
+---
+
 # HiViz Blame Procedure
 
 `blame` answers provenance questions about instruction lines: when written, by
@@ -33,4 +38,5 @@ Sources, in order of trust:
   verification** wins. State this explicitly when proposing conflict resolutions.
 - Pre-hiviz corpora show "(no entry — pre-hiviz history only)" — mine the
   session logs; if they predate logging too, say `unknown origin` honestly.
+
 

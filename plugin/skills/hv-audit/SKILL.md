@@ -1,3 +1,8 @@
+---
+name: hv-audit
+description: "Audit standing agent instructions (AGENTS.md, CLAUDE.md, skills, subagents, MCP config) for prompt debt — stale facts, trained-duplicates, relics, always/never rules, conflicts. Triggers on: prompt debt, clean up AGENTS.md/CLAUDE.md, instruction review, instructions gone stale. Analysis only — apply is a separate human-decided step."
+---
+
 # HiViz Audit Procedure
 
 Audit standing instructions for prompt debt. **Do not rewrite anything in this phase.**
@@ -87,3 +92,4 @@ Tell the user both paths. The HTML is a generated view — never hand-edit it.
 Print the executive block into the chat (verbatim) and STOP.
 
 Do not propose a ready rewritten version. Decisions belong to the human.
+

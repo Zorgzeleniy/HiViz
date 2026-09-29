@@ -1,3 +1,8 @@
+---
+name: hv-drift
+description: "Deterministic drift check: standing instructions vs the live environment. Reads .hiviz/facts.toml, runs checkers (file_exists/file_contains/dir_glob/shell/port_open), reports OK/STALE/UNVERIFIABLE. Triggers on: instruction drift, are my AGENTS.md facts stale, environment mismatch, 'факты протухли'. STALE = prompt debt — propose resolutions, human decides."
+---
+
 # HiViz Drift Procedure
 
 Drift = standing instructions that no longer match the environment. This
@@ -47,3 +52,4 @@ environment you have not checked.
 
 The drift report is a decision table like any other audit: the user approves
 each proposal; applying goes through the apply procedure (backups, probes).
+

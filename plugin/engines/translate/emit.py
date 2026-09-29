@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""hiviz translator emit — mechanical placement of an instruction IR.
+
+Input: IR jsonl, one entry per line:
+  {"id": "r1", "text": "- ...", "kind": "safety|invariant|rule|fact",
+   "source": "AGENTS.md:12", "assumes": ["f-x"], "dedup_of": null|"r0"}
+
+Entries with dedup_of set are DROPPED (dedup was decided at IR authoring).
+Placement per target (safety section first in every single-file target):
+  omp       -> RULES.md (safety) + AGENTS.md (invariant, rule, fact)
+  claude    -> CLAUDE.md
+  codex     -> AGENTS.md
+  pi        -> AGENTS.md
+  opencode  -> AGENTS.md
+  cursor    -> .cursor/rules/hiviz.mdc   (alwaysApply rule)
+  windsurf  -> .windsurf/rules/hiviz.md  (always_on rule, 12,000-char limit)
+
+Modes:
+  default        emit files + translation-report.md into --out
+  --check        verify the LIVE files at --out against the mechanical emission
+                 from the IR; exit 1 on divergence (CI-friendly: catches
+                 "two harness configs drifted apart" after a migration)
+
+Stdlib only; without --check it writes only into --out.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+KIND_ORDER = ["safety", "invariant", "rule", "fact"]
+TARGETS = {
+    "omp": [("RULES.md", ["safety"]), ("AGENTS.md", ["invariant", "rule", "fact"])],
+    "claude": [("CLAUDE.md", KIND_ORDER)],
+    "codex": [("AGENTS.md", KIND_ORDER)],
+    "pi": [("AGENTS.md", KIND_ORDER)],
+    "opencode": [("AGENTS.md", KIND_ORDER)],
+    "cursor": [(".cursor/rules/hiviz.mdc", KIND_ORDER)],
+    "windsurf": [(".windsurf/rules/hiviz.md", KIND_ORDER)],
+}
+# Rule files that need frontmatter to load at all (Cursor ignores .mdc without it).
+PREAMBLE = {
+    ".cursor/rules/hiviz.mdc": "---\ndescription: Standing instructions (translated by hiviz)\nalwaysApply: true\n---\n\n",
+    ".windsurf/rules/hiviz.md": "---\ntrigger: always_on\n---\n\n",
+}
+CHAR_LIMITS = {".windsurf/rules/hiviz.md": 12000}
+KIND_HEADERS = {"safety": "Safety (non-negotiable)", "invariant": "Environment invariants",
+                "rule": "Rules", "fact": "Facts"}
+
+
+def load_ir(path: Path) -> tuple[list[dict], list[dict]]:
+    kept, dropped = [], []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        try:
+            e = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        (dropped if e.get("dedup_of") else kept).append(e)
+    return kept, dropped
+
+
+def render_target(kept: list[dict], target: str, name: str) -> dict[str, str]:
+    files = {}
+    for fname, kinds in TARGETS[target]:
+        sections = []
+        for kind in kinds:
+            rows = [e for e in kept if e.get("kind") == kind]
+            if not rows:
+                continue
+            body = "\n".join(e["text"].rstrip() for e in rows)
+            srcs = ", ".join(sorted({e.get("source", "?").split(":")[0] for e in rows}))
+            sections.append(f"## {KIND_HEADERS[kind]}\n\n{body}\n\n<!-- sources: {srcs} -->")
+        if not sections:
+            continue
+        files[fname] = (PREAMBLE.get(fname, "") + f"# {name} — translated from source corpus (hiviz)\n\n"
+                        + "\n\n".join(sections))
+    return files
+
+
+def emit(kept: list[dict], target: str, out: Path, name: str) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    for fname, content in render_target(kept, target, name).items():
+        (out / fname).parent.mkdir(parents=True, exist_ok=True)
+        (out / fname).write_text(content, encoding="utf-8")
+        print(f"  wrote {out / fname}")
+        limit = CHAR_LIMITS.get(fname)
+        if limit and len(content) > limit:
+            print(f"  WARNING {fname}: {len(content):,} chars > {limit:,} — the harness truncates the rest",
+                  file=sys.stderr)
+
+
+def check(kept: list[dict], target: str, live: Path, name: str) -> int:
+    bad = 0
+    for fname, expected in render_target(kept, target, name).items():
+        p = live / fname
+        if not p.exists():
+            print(f"DIVERGED {fname}: file missing")
+            bad += 1
+            continue
+        actual = p.read_text(encoding="utf-8", errors="replace")
+        if actual == expected:
+            print(f"OK       {fname}")
+            continue
+        a_lines = set(actual.splitlines())
+        e_lines = set(expected.splitlines())
+        missing = [l for l in expected.splitlines() if l not in a_lines and l.strip()]
+        extra = [l for l in actual.splitlines() if l not in e_lines and l.strip()]
+        missing_text = "\n".join(missing)
+        ids = [e["id"] for e in kept if e["text"].rstrip() in missing_text]
+        hint = f"rules lost: {', '.join(ids)}" if ids else "content drift"
+        print(f"DIVERGED {fname}: {len(missing)} expected line(s) missing, "
+              f"{len(extra)} unexpected ({hint})")
+        bad += 1
+    print(f"\n{len(TARGETS[target]) - bad}/{len(TARGETS[target])} files in sync" if TARGETS[target] else "")
+    return 1 if bad else 0
+
+
+def report(kept: list[dict], dropped: list[dict], target: str, out: Path) -> None:
+    lines = [f"# Translation report — target: {target}",
+             "", f"- translated: {len(kept)} entries",
+             f"- deduplicated away: {len(dropped)}"]
+    for d in dropped:
+        lines.append(f"  - `{d['id']}` duplicate of `{d['dedup_of']}`")
+    lines += ["", "| id | kind | source |", "|---|---|---|"]
+    for e in kept:
+        lines.append(f"| {e['id']} | {e.get('kind')} | {e.get('source', '?')} |")
+    (out / "translation-report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"  wrote {out / 'translation-report.md'}")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="hiviz translator emit")
+    ap.add_argument("--ir", required=True)
+    ap.add_argument("--target", required=True, choices=sorted(TARGETS))
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--name", default="Agent instructions")
+    ap.add_argument("--check", action="store_true",
+                    help="verify live files at --out against the IR emission instead of writing")
+    a = ap.parse_args()
+    kept, dropped = load_ir(Path(a.ir))
+    kinds = {k: sum(1 for e in kept if e.get("kind") == k) for k in KIND_ORDER}
+    print(f"IR: {len(kept)} entries kept, {len(dropped)} dedup-dropped "
+          f"(safety={kinds['safety']} invariant={kinds['invariant']} "
+          f"rule={kinds['rule']} fact={kinds['fact']})")
+    if a.check:
+        return check(kept, a.target, Path(a.out), a.name)
+    emit(kept, a.target, Path(a.out), a.name)
+    report(kept, dropped, a.target, Path(a.out))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

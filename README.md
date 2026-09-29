@@ -191,6 +191,20 @@ Detects every supported agent on your machine, installs the right adapter into e
 npx @zorgzeleniy/hiviz init
 ```
 
+**Or through your agent's own plugin manager** — same skills, engines bundled, updates via the harness:
+
+| Harness     | Install                                                                                        |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| Claude Code | `/plugin marketplace add Zorgzeleniy/hiviz` → `/plugin install hiviz@hiviz` (skills: `/hiviz:hv-audit` …) |
+| omp         | `/marketplace add Zorgzeleniy/hiviz` → `/marketplace install hiviz@hiviz`                       |
+| Codex       | `codex plugin marketplace add Zorgzeleniy/hiviz` → `codex plugin add hiviz@hiviz`               |
+| pi          | `pi install npm:@zorgzeleniy/hiviz`                                                            |
+| Cursor      | Cursor Marketplace (the repo ships `.cursor-plugin/marketplace.json` + an Agent Plugins `plugin.json`) |
+
+OpenCode and Windsurf have no skills marketplace — use `npx`. `hiviz init` notices a plugin install and skips that harness, so you never get the skills twice.
+
+**Uninstall** (`npx @zorgzeleniy/hiviz uninstall`, preview with `--dry`) deletes only files hiviz wrote — each one is checked for the HiViz procedure heading — plus `~/.hiviz/engines`. It keeps your own files even when they sit in a hiviz skill dir, keeps `~/.hiviz/` when it holds your data (ledger, reports from an audit run in `$HOME`), never follows or removes symlinks, prunes only the empty dirs it leaves behind, and also cleans up adapters from the pre-rename `exuvia` package. Plugin installs are removed with the harness's own command (`/plugin uninstall hiviz@hiviz`, `codex plugin remove hiviz@hiviz`, `pi remove npm:@zorgzeleniy/hiviz`); uninstall prints the right one.
+
 ### 🕐 The first five minutes
 
 1. **Run the audit.** `/hv-audit` (Claude Code, OpenCode), the `hv-audit` skill (Codex, omp, pi, Cursor, Windsurf) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule / conflict — with a recommendation each.

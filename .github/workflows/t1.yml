@@ -20,5 +20,7 @@ jobs:
         run: |
           node --check bin/hiviz.js
           python tests/parity.py
+      - name: marketplace plugin is current (plugin/ + catalogs rendered from core/, templates/, engines)
+        run: node scripts/build-plugin.js --check
       - name: deterministic test rig (T1)
         run: python tests/run.py --t1
