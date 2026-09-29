@@ -224,27 +224,7 @@ def uninstall_checks() -> None:
 
 
 def uninstall_edge_checks() -> None:
-    """exuvia leftovers, symlinked skill dirs and permission errors."""
-    home = fresh_home("exuvia")
-    for m in (".claude/commands", ".codex/prompts", ".omp/agent/skills"):
-        (home / m).mkdir(parents=True)
-    ex = "# Exuvia Audit Procedure\nold exuvia body\n"
-    plants = {".claude/commands/exuvia-audit.md": ex, ".codex/prompts/exuvia-drift.md": ex,
-              ".codex/skills/exuvia-audit/SKILL.md": ex, ".omp/agent/skills/exuvia-blame/SKILL.md": ex,
-              ".exuvia/engines/drift/check.py": "x\n"}
-    mine = {".claude/commands/exuvia-test.md": "my own command that happens to share the name\n",
-            ".exuvia/ledger.jsonl": "{}\n"}
-    for rel, txt in {**plants, **mine}.items():
-        (home / rel).parent.mkdir(parents=True, exist_ok=True)
-        (home / rel).write_text(txt, encoding="utf-8")
-    st = sh(["node", "bin/hiviz.js", "status"], env=home_env(home))
-    u = sh(["node", "bin/hiviz.js", "uninstall"], env=home_env(home))
-    left = [r for r in plants if (home / r).exists()]
-    lost = [r for r in mine if not (home / r).exists()]
-    check("uninstall: exuvia (pre-rename) adapters + ~/.exuvia/engines removed, user files kept",
-          u.returncode == 0 and not left and not lost and "legacy adapters" in st.stdout
-          and not (home / ".codex/skills").exists(), f"left={left} lost={lost}")
-
+    """Symlinked skill dirs and permission errors."""
     # symlinks: never followed into someone else's store, never unlinked, never crash
     home = fresh_home("symlinks")
     (home / ".codex").mkdir()
@@ -655,9 +635,9 @@ def t2() -> None:
           f"{o}/decisions.md (DECISION column empty). Do NOT modify any audited file. "
           "Your final chat reply: one summary line only. English.")
     report = OUT / "report.md"
-    reuse = os.environ.get("EXUVIA_REUSE") == "1"
+    reuse = os.environ.get("HIVIZ_REUSE") == "1"
     if reuse and report.exists() and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
-        print("  [skip] reusing existing report.md (EXUVIA_REUSE=1)")
+        print("  [skip] reusing existing report.md (HIVIZ_REUSE=1)")
     else:
         r = sh(["omp", "--profile", "hiviz-test", "-p", audit_prompt], timeout=1500)
         (OUT / "audit-last-output.txt").write_text(

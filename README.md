@@ -203,7 +203,7 @@ npx @zorgzeleniy/hiviz init
 
 OpenCode and Windsurf have no skills marketplace — use `npx`. `hiviz init` notices a plugin install and skips that harness, so you never get the skills twice.
 
-**Uninstall** (`npx @zorgzeleniy/hiviz uninstall`, preview with `--dry`) deletes only files hiviz wrote — each one is checked for the HiViz procedure heading — plus `~/.hiviz/engines`. It keeps your own files even when they sit in a hiviz skill dir, keeps `~/.hiviz/` when it holds your data (ledger, reports from an audit run in `$HOME`), never follows or removes symlinks, prunes only the empty dirs it leaves behind, and also cleans up adapters from the pre-rename `exuvia` package. Plugin installs are removed with the harness's own command (`/plugin uninstall hiviz@hiviz`, `codex plugin remove hiviz@hiviz`, `pi remove npm:@zorgzeleniy/hiviz`); uninstall prints the right one.
+**Uninstall** (`npx @zorgzeleniy/hiviz uninstall`, preview with `--dry`) deletes only files hiviz wrote — each one is checked for the HiViz procedure heading — plus `~/.hiviz/engines`. It keeps your own files even when they sit in a hiviz skill dir, keeps `~/.hiviz/` when it holds your data (ledger, reports from an audit run in `$HOME`), never follows or removes symlinks, and prunes only the empty dirs it leaves behind. Plugin installs are removed with the harness's own command (`/plugin uninstall hiviz@hiviz`, `codex plugin remove hiviz@hiviz`, `pi remove npm:@zorgzeleniy/hiviz`); uninstall prints the right one.
 
 ### 🕐 The first five minutes
 

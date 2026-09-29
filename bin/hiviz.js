@@ -121,32 +121,22 @@ function pluginInstalls() {
   return out;
 }
 
-// Adapters written by hiviz <= 0.7 and by its predecessor exuvia (npm `exuvia` <= 0.6), each
-// deleted only when it carries that product's heading.
-const EXUVIA_MARK = "# Exuvia ";
+// Adapters written by hiviz <= 0.7, deleted only when they carry the HiViz heading.
 const LEGACY_WINDSURF_HEAD = "Audit standing instructions for prompt debt (stale facts, duplicates, relics, conflicts).";
 const WINDSURF_RULES = path.join(HOME, ".codeium", "windsurf", "memories", "global_rules.md");
 function legacyTargets() {
-  const cmds = ["audit", "apply", "drift", "test", "blame", "translate"];
-  const hv = cmds.map((n) => path.join(CODEX_DIR, "prompts", `hv-${n}.md`));
-  hv.push(path.join(CODEX_DIR, "skills", "hv-audit", "SKILL.md"));
-  hv.push(path.join(HOME, ".cursor", "rules", "hiviz.mdc"));
-  hv.push(path.join(XDG_CONFIG, "opencode", "command", "hiviz.md"));
-  const ex = [
-    ...cmds.map((n) => path.join(CLAUDE_DIR, "commands", `exuvia-${n}.md`)),
-    ...cmds.map((n) => path.join(CODEX_DIR, "prompts", `exuvia-${n}.md`)),
-    path.join(CODEX_DIR, "skills", "exuvia-audit", "SKILL.md"),
-    ...["audit", "drift", "constitution", "blame", "translate"].map((n) => path.join(OMP_DIR, "skills", `exuvia-${n}`, "SKILL.md")),
-    path.join(HOME, ".cursor", "rules", "exuvia.mdc"),
-    path.join(XDG_CONFIG, "opencode", "command", "exuvia.md"),
-  ];
-  return [...hv.map((p) => [p, OWNERSHIP_MARK]), ...ex.map((p) => [p, EXUVIA_MARK])].filter(([p, m]) => owned(p, m));
+  const out = ["audit", "apply", "drift", "test", "blame", "translate"]
+    .map((n) => path.join(CODEX_DIR, "prompts", `hv-${n}.md`));
+  out.push(path.join(CODEX_DIR, "skills", "hv-audit", "SKILL.md"));
+  out.push(path.join(HOME, ".cursor", "rules", "hiviz.mdc"));
+  out.push(path.join(XDG_CONFIG, "opencode", "command", "hiviz.md"));
+  return out.filter((p) => owned(p));
 }
 // Old installers overwrote the user's whole global_rules.md; it may since hold user edits,
 // so it is moved aside, never deleted.
 const legacyWindsurf = () => (readText(WINDSURF_RULES) || "").startsWith(LEGACY_WINDSURF_HEAD);
 
-const owned = (p, mark = OWNERSHIP_MARK) => (readText(p) || "").includes(mark);
+const owned = (p) => (readText(p) || "").includes(OWNERSHIP_MARK);
 const isLink = (p) => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
 
 // Empty dirs hiviz may have created are pruned upward; harness config roots and HOME never are.
@@ -174,7 +164,7 @@ function pruneEmpty(dir, dry, log) {
 
 // Removes one adapter file hiviz owns. Skill dirs go only when nothing of the user's is left in them.
 // Returns 1 when something was (or would be) removed. Failures are reported and counted, never thrown.
-function removeAdapter(file, label, dry, log, mark = OWNERSHIP_MARK) {
+function removeAdapter(file, label, dry, log) {
   const dir = path.dirname(file);
   const isSkill = path.basename(file) === "SKILL.md";
   const shown = path.relative(HOME, isSkill ? dir : file);
@@ -187,7 +177,7 @@ function removeAdapter(file, label, dry, log, mark = OWNERSHIP_MARK) {
       // a kept dir may have been emptied by the user since the last uninstall
       return !dry && fs.existsSync(dir) && pruneEmpty(dir, dry, log) > 0 ? 1 : 0;
     }
-    if (!owned(file, mark)) { log(`  ! kept ${path.relative(HOME, file)} — not written by hiviz`); return 0; }
+    if (!owned(file)) { log(`  ! kept ${path.relative(HOME, file)} — not written by hiviz`); return 0; }
     if (dry) log(`  ~ would remove ${label} ${shown}`);
     else { fs.rmSync(file, { force: true }); log(`  - removed ${label} ${shown}`); }
     if (isSkill) {
@@ -206,7 +196,7 @@ let failures = 0;
 
 function removeLegacy(dry, log) {
   let n = 0;
-  for (const [p, mark] of legacyTargets()) n += removeAdapter(p, "legacy", dry, log, mark);
+  for (const p of legacyTargets()) n += removeAdapter(p, "legacy", dry, log);
   if (legacyWindsurf()) {
     const bak = `${WINDSURF_RULES}.hiviz-bak`;
     try {
@@ -215,12 +205,11 @@ function removeLegacy(dry, log) {
       n++;
     } catch (e) { log(`  ! FAILED to move ${path.relative(HOME, WINDSURF_RULES)}: ${e.code || e.message}`); failures++; }
   }
-  n += removeEngineDir(path.join(HOME, ".exuvia", "engines"), "~/.exuvia", dry, log);
   return n;
 }
 
-// Deletes an engines dir, then its parent only when empty: ~/.hiviz and ~/.exuvia double as the
-// project data dir when an audit ran in $HOME (ledger, reports, facts).
+// Deletes an engines dir, then its parent only when empty: ~/.hiviz doubles as the project data
+// dir when an audit ran in $HOME (ledger, reports, facts).
 function removeEngineDir(engines, shown, dry, log) {
   let n = 0;
   try {
@@ -287,7 +276,7 @@ function status() {
     const plug = plugins[h.id] ? " · plugin INSTALLED" : "";
     console.log(`  ${h.name.padEnd(12)} ${det ? "detected" : "not found"} · adapter ${!det ? "n/a" : inst ? "INSTALLED" : plug ? "not needed" : "missing (run: hiviz init)"}${plug}`);
   }
-  const legacy = legacyTargets().length + (legacyWindsurf() ? 1 : 0) + (fs.existsSync(path.join(HOME, ".exuvia", "engines")) ? 1 : 0);
+  const legacy = legacyTargets().length + (legacyWindsurf() ? 1 : 0);
   if (legacy) console.log(`  legacy adapters from an older hiviz: ${legacy} (run: hiviz init to migrate)`);
 }
 
