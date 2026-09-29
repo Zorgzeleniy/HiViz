@@ -79,11 +79,22 @@ def mcp_rows(path: Path, min_tokens: int, stale_days: int) -> list[dict]:
                          "description": "MCP server footprint vs usage"})
             continue
         toks, calls, lu = r.get("tokens", 0), r.get("calls", 0), r.get("last_used")
+        try:
+            lu_date = date.fromisoformat(lu) if lu else None
+        except (TypeError, ValueError):
+            rows.append({"id": f"mcp:{name}", "status": "UNVERIFIABLE",
+                         "detail": f"unreadable last_used: {str(lu)[:30]}",
+                         "description": "MCP server footprint vs usage"})
+            continue
         if toks < min_tokens:
             status, detail = "OK", f"{toks} tokens/session (below {min_tokens} threshold)"
+        elif calls is None:
+            # meters could not mine logs of any harness that loads this server
+            status, detail = "UNVERIFIABLE", (f"{toks:,} tokens/session, usage unknown "
+                                              f"(no session logs for {r.get('harnesses') or '?'})")
         elif calls == 0:
             status, detail = "STALE", f"{toks:,} tokens/session, 0 calls ever"
-        elif lu and (today - date.fromisoformat(lu)).days > stale_days:
+        elif lu_date and (today - lu_date).days > stale_days:
             status, detail = "STALE", f"{toks:,} tokens/session, last used {lu}"
         else:
             status, detail = "OK", f"{toks:,} tokens/session, {calls} calls, last {lu}"

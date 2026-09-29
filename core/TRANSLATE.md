@@ -1,8 +1,8 @@
 # HiViz Translate Procedure
 
-Migrate a standing-instruction corpus between harnesses (omp ↔ Claude Code ↔
-Codex ↔ Cursor) without losing rules — equivalence is PROVEN by probes, not
-promised.
+Migrate a standing-instruction corpus between harnesses (omp · pi · Claude Code ·
+Codex · Cursor · Windsurf · OpenCode) without losing rules — equivalence is
+PROVEN by probes, not promised.
 
 ## 1. Harvest the source corpus
 
@@ -24,7 +24,7 @@ per surviving line:
 ## 2. Emit mechanically
 
 ```
-python <hiviz>/translate/emit.py --ir .hiviz/ir.jsonl --target <omp|claude|codex|cursor> --out <dir>
+python <hiviz>/translate/emit.py --ir .hiviz/ir.jsonl --target <omp|pi|claude|codex|cursor|windsurf|opencode> --out <dir>
 ```
 
 Divergence check (CI-friendly — verifies the live target files still match the
@@ -35,9 +35,10 @@ python <hiviz>/translate/emit.py --ir .hiviz/ir.jsonl --target <t> --out <live-d
 ```
 
 `<hiviz>` = repo checkout or `~/.hiviz/engines`. Placement: omp → safety to
-`RULES.md`, the rest to `AGENTS.md`; claude → `CLAUDE.md`; codex → `AGENTS.md`;
-cursor → `.cursorrules` (safety section first everywhere). A
-`translation-report.md` records what moved and what was deduplicated.
+`RULES.md`, the rest to `AGENTS.md`; claude → `CLAUDE.md`; codex / pi / opencode →
+`AGENTS.md`; cursor → `.cursor/rules/hiviz.mdc` (`alwaysApply`); windsurf →
+`.windsurf/rules/hiviz.md` (`always_on`, warns past 12,000 chars). Safety section
+first everywhere. A `translation-report.md` records what moved and what was deduplicated.
 
 ## 3. Prove equivalence
 
@@ -45,8 +46,11 @@ Run the constitution suite on the TARGET side with the migrated corpus active
 (fresh sandbox profile / project dir):
 
 ```
-python <hiviz>/constitution/run.py --tests .hiviz/tests --harness "<target harness> -p \"{ask}\"" --corpus <migrated dir>
+python <hiviz>/constitution/run.py --tests .hiviz/tests --harness <omp|pi|claude|codex|cursor|opencode> --corpus <migrated dir>
 ```
+
+Windsurf has no headless CLI: prove a Windsurf target by probing the same IR
+emitted for another harness, or run the asks manually in Cascade.
 
 Every test that passed on the source side must pass on the target side. A test
 that fails after migration = a rule the translation lost → fix the IR, re-emit,

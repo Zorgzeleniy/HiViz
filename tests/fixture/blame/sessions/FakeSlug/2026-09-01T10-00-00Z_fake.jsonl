@@ -1,4 +1,4 @@
-{"type":"session","version":3,"id":"fake-0001","title":"plant fixture: add gateway note","timestamp":"2026-09-01T10:00:00.000Z","cwd":"D:\\Ai\\exuvia"}
+{"type":"session","version":3,"id":"fake-0001","title":"plant fixture: add gateway note","timestamp":"2026-09-01T10:00:00.000Z","cwd":"{{REPO}}"}
 {"type":"model_change","id":"m1","timestamp":"2026-09-01T10:00:01.000Z","model":"zai/glm-test-model"}
 {"type":"message","id":"a1","timestamp":"2026-09-01T10:00:05.000Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"call_1","name":"edit","arguments":{"input":"[{{REPO}}/tests/fixture/agent/AGENTS.md#AAAA]\nPUT 4.=4:\n+- Deploys go through `npm run deploy -- --profile=staging`; the staging gateway answers at 10.0.0.42 (legacy)."}}]}}
 {"type":"message","id":"a2","timestamp":"2026-09-01T10:05:00.000Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"call_2","name":"write","arguments":{"path":"{{REPO}}/tests/fixture/agent/AGENTS.md","content":"# AGENTS.md\nunrelated rewrite"}}]}}

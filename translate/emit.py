@@ -6,11 +6,14 @@ Input: IR jsonl, one entry per line:
    "source": "AGENTS.md:12", "assumes": ["f-x"], "dedup_of": null|"r0"}
 
 Entries with dedup_of set are DROPPED (dedup was decided at IR authoring).
-Placement per target:
-  omp     -> RULES.md (safety) + AGENTS.md (invariant, rule, fact)
-  claude  -> CLAUDE.md (all, safety section first)
-  codex   -> AGENTS.md (all, safety section first)
-  cursor  -> .cursorrules (all, safety section first)
+Placement per target (safety section first in every single-file target):
+  omp       -> RULES.md (safety) + AGENTS.md (invariant, rule, fact)
+  claude    -> CLAUDE.md
+  codex     -> AGENTS.md
+  pi        -> AGENTS.md
+  opencode  -> AGENTS.md
+  cursor    -> .cursor/rules/hiviz.mdc   (alwaysApply rule)
+  windsurf  -> .windsurf/rules/hiviz.md  (always_on rule, 12,000-char limit)
 
 Modes:
   default        emit files + translation-report.md into --out
@@ -32,16 +35,25 @@ TARGETS = {
     "omp": [("RULES.md", ["safety"]), ("AGENTS.md", ["invariant", "rule", "fact"])],
     "claude": [("CLAUDE.md", KIND_ORDER)],
     "codex": [("AGENTS.md", KIND_ORDER)],
-    "cursor": [(".cursorrules", KIND_ORDER)],
+    "pi": [("AGENTS.md", KIND_ORDER)],
+    "opencode": [("AGENTS.md", KIND_ORDER)],
+    "cursor": [(".cursor/rules/hiviz.mdc", KIND_ORDER)],
+    "windsurf": [(".windsurf/rules/hiviz.md", KIND_ORDER)],
 }
+# Rule files that need frontmatter to load at all (Cursor ignores .mdc without it).
+PREAMBLE = {
+    ".cursor/rules/hiviz.mdc": "---\ndescription: Standing instructions (translated by hiviz)\nalwaysApply: true\n---\n\n",
+    ".windsurf/rules/hiviz.md": "---\ntrigger: always_on\n---\n\n",
+}
+CHAR_LIMITS = {".windsurf/rules/hiviz.md": 12000}
 KIND_HEADERS = {"safety": "Safety (non-negotiable)", "invariant": "Environment invariants",
                 "rule": "Rules", "fact": "Facts"}
 
 
 def load_ir(path: Path) -> tuple[list[dict], list[dict]]:
     kept, dropped = [], []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
         if not line:
             continue
         try:
@@ -65,15 +77,21 @@ def render_target(kept: list[dict], target: str, name: str) -> dict[str, str]:
             sections.append(f"## {KIND_HEADERS[kind]}\n\n{body}\n\n<!-- sources: {srcs} -->")
         if not sections:
             continue
-        files[fname] = f"# {name} — translated from source corpus (hiviz)\n\n" + "\n\n".join(sections)
+        files[fname] = (PREAMBLE.get(fname, "") + f"# {name} — translated from source corpus (hiviz)\n\n"
+                        + "\n\n".join(sections))
     return files
 
 
 def emit(kept: list[dict], target: str, out: Path, name: str) -> None:
     out.mkdir(parents=True, exist_ok=True)
     for fname, content in render_target(kept, target, name).items():
+        (out / fname).parent.mkdir(parents=True, exist_ok=True)
         (out / fname).write_text(content, encoding="utf-8")
         print(f"  wrote {out / fname}")
+        limit = CHAR_LIMITS.get(fname)
+        if limit and len(content) > limit:
+            print(f"  WARNING {fname}: {len(content):,} chars > {limit:,} — the harness truncates the rest",
+                  file=sys.stderr)
 
 
 def check(kept: list[dict], target: str, live: Path, name: str) -> int:

@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -21,6 +23,15 @@ from pathlib import Path
 
 
 VERDICT_ORDER = {"FAIL": 0, "ERROR": 1, "ORPHANED": 2, "FLAKY": 3, "PASS": 4}
+# Headless one-shot commands. {ask} becomes ONE argv element — never shell-parsed.
+HARNESSES = {
+    "omp": 'omp -p "{ask}"',
+    "pi": 'pi -p "{ask}"',
+    "claude": 'claude -p "{ask}"',
+    "codex": 'codex exec "{ask}"',
+    "cursor": 'cursor-agent -p "{ask}"',
+    "opencode": 'opencode run "{ask}"',
+}
 
 
 def load_tests(tests_dir: Path) -> list[dict]:
@@ -39,26 +50,45 @@ def guard_orphaned(t: dict, corpus: Path | None) -> bool:
     m = re.search(r"`([^`]+)`", g)
     if not (corpus and m):
         return False
-    marker, needle = m.group(1), (t.get("guards_needle") or m.group(1))
+    needle = t.get("guards_needle") or m.group(1)  # guards_needle overrides the displayed marker
     for f in corpus.rglob("*"):
-        if f.is_file() and f.suffix in (".md", ".toml", ".json"):
+        if f.is_file() and f.suffix in (".md", ".mdc", ".toml", ".json"):
             try:
-                if marker in f.read_text(encoding="utf-8", errors="replace"):
+                if needle in f.read_text(encoding="utf-8", errors="replace"):
                     return False
             except OSError:
                 continue
     return True
 
 
-def run_probe(harness_cmd: str, ask: str, timeout: float) -> str:
-    cmd = harness_cmd.replace("{ask}", ask.replace('"', '\\"'))
+def build_argv(template: str, ask: str) -> list[str]:
+    posix = os.name != "nt"  # keep Windows backslash paths intact
+    parts = shlex.split(template, posix=posix)
+    if not posix:
+        parts = [x[1:-1] if len(x) >= 2 and x[0] == x[-1] == '"' else x for x in parts]
+    if not any("{ask}" in x for x in parts):
+        parts.append("{ask}")
+    argv = [x.replace("{ask}", ask) for x in parts]
+    exe = shutil.which(argv[0])  # resolves Windows .cmd shims (npm-installed CLIs)
+    if exe:
+        argv[0] = exe
+    return argv
+
+
+def run_probe(harness_cmd: str, ask: str, timeout: float) -> tuple[str | None, str]:
+    """Returns (answer, error). The answer is stdout only: stderr carries harness
+    noise (logs, "command not found") that must never satisfy a marker."""
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+        r = subprocess.run(build_argv(harness_cmd, ask), capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=timeout)
     except subprocess.TimeoutExpired:
-        return f"runner TIMEOUT after {timeout}s"
-    return (r.stdout or "") + "\n" + (r.stderr or "")
-
+        return None, f"harness TIMEOUT after {timeout}s"
+    except OSError as e:
+        return None, f"harness failed to start: {e}"[:160]
+    if r.returncode != 0:
+        tail = (r.stderr or r.stdout or "").strip().splitlines()[-1:] or [""]
+        return None, f"harness exit {r.returncode}: {tail[0][:120]}"
+    return r.stdout or "", ""
 
 
 def evaluate(answer: str, t: dict) -> tuple[bool, str]:
@@ -67,58 +97,71 @@ def evaluate(answer: str, t: dict) -> tuple[bool, str]:
             break
     else:
         if t.get("must_include_any"):
-            return False, f"none of must_include_any matched"
+            return False, "none of must_include_any matched"
     for pattern in t.get("must_not_match") or []:
-        if re.search(pattern, answer):
+        if re.search(pattern, answer, re.IGNORECASE):
             return False, f"must_not_match matched: {pattern}"
     return True, "markers ok"
 
 
-def judge(t: dict, harness_cmd: str, corpus: Path | None, timeout: float, retried: dict) -> str:
+def judge(t: dict, harness_cmd: str, corpus: Path | None, timeout: float, retried: dict) -> tuple[str, str]:
     if guard_orphaned(t, corpus):
-        return "ORPHANED"
-    ok, why = evaluate(run_probe(harness_cmd, t["ask"], timeout), t)
+        return "ORPHANED", "guarded line not found in corpus"
+    answer, err = run_probe(harness_cmd, t["ask"], timeout)
+    if err:
+        return "ERROR", err
+    ok, why = evaluate(answer, t)
     if ok:
-        return "PASS"
+        return "PASS", why
     if not retried.get(t["id"]):
         retried[t["id"]] = True
-        ok2, why2 = evaluate(run_probe(harness_cmd, t["ask"], timeout), t)
+        answer2, err2 = run_probe(harness_cmd, t["ask"], timeout)
+        if err2:
+            return "ERROR", err2
+        ok2, why2 = evaluate(answer2, t)
         if ok2:
-            return "FLAKY"
-    return "FAIL"
+            return "FLAKY", f"first attempt: {why}"
+    return "FAIL", why
 
 
 def detect_harness() -> str | None:
-    for binname, cmd in [("omp", "omp -p"), ("claude", "claude -p"), ("codex", "codex exec")]:
-        if shutil.which(binname):
-            return f'{cmd} "{{ask}}"'
+    forced = os.environ.get("HIVIZ_HARNESS", "").strip()
+    if forced:
+        return HARNESSES.get(forced, forced)
+    if os.environ.get("CLAUDECODE") and shutil.which("claude"):  # set inside Claude Code sessions
+        return HARNESSES["claude"]
+    for tpl in HARNESSES.values():
+        if shutil.which(tpl.split()[0]):
+            return tpl
     return None
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="hiviz constitution runner")
     ap.add_argument("--tests", default=".hiviz/tests")
-    ap.add_argument("--harness", default="auto", help='command template with {ask}, or "auto"')
+    ap.add_argument("--harness", default="auto",
+                    help=f'harness name ({", ".join(HARNESSES)}), a command template with {{ask}}, '
+                         'or "auto" (HIVIZ_HARNESS env, then the first CLI found on PATH)')
     ap.add_argument("--corpus", default=None, help="dir to check guards against (orphaned)")
     ap.add_argument("--timeout", type=float, default=240.0)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
 
-    harness = a.harness
+    harness = HARNESSES.get(a.harness, a.harness)
     if harness == "auto":
         harness = detect_harness()
         if not harness:
-            print("no harness CLI detected (omp/claude/codex) — pass --harness", file=sys.stderr)
+            print(f"no harness CLI detected ({'/'.join(HARNESSES)}) — pass --harness", file=sys.stderr)
             return 2
 
     tests = load_tests(Path(a.tests))
     retried: dict = {}
     rows = []
     for t in tests:
-        verdict = judge(t, harness, Path(a.corpus) if a.corpus else None, a.timeout, retried)
+        verdict, detail = judge(t, harness, Path(a.corpus) if a.corpus else None, a.timeout, retried)
         rows.append({"id": t["id"], "verdict": verdict, "severity": t.get("severity", "normal"),
-                     "guards": t.get("guards", ""), "ask": t.get("ask", "")})
-        print(f"  {verdict:8} {t['id']}")
+                     "guards": t.get("guards", ""), "ask": t.get("ask", ""), "detail": detail})
+        print(f"  {verdict:8} {t['id']}" + (f" — {detail}" if verdict != "PASS" else ""))
 
     rows.sort(key=lambda r: (VERDICT_ORDER[r["verdict"]], r["id"]))
     print("\n| verdict | test | guards |")

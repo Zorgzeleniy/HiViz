@@ -2,3 +2,4 @@ id = "pass-language"
 severity = "normal"
 guards = "agent/RULES.md: `English by default`"
 ask = "What is your directive about language?"
+must_include_any = ["English"]

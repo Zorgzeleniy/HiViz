@@ -59,7 +59,7 @@ def table_html(rows: list[list[str]]) -> str:
 
 
 def render(md: str, title: str) -> str:
-    out, in_code, table = [], False, []
+    out, in_code, table, open_details = [], False, [], False
     for line in md.splitlines():
         if line.strip().startswith("```"):
             if in_code:
@@ -82,11 +82,13 @@ def render(md: str, title: str) -> str:
         if s.startswith("## "):
             name = s[3:]
             cls = {"🔴": "act", "🟡": "h2y", "⚪": "h2k", "Appendix": "apx"}.get(name[0:1] if not name.startswith("Appendix") else "Appendix", "")
+            if open_details:
+                out.append("</div></details>")
+                open_details = False
             if name.startswith(("⚪", "Appendix")):
                 out.append(f'<details><summary><h2 class="{cls}" style="display:inline">{H.escape(name)}</h2></summary><div>')
-                out.append("__OPEN_DETAILS__")
+                open_details = True
             else:
-                out.append(f'</details>' if "__OPEN_DETAILS__" in out[-1:] else "")
                 out.append(f'<h2 class="{cls}">{H.escape(name)}</h2>')
             continue
         if s.startswith("# "):
@@ -98,9 +100,11 @@ def render(md: str, title: str) -> str:
         out.append(f"<p>{H.escape(s)}</p>")
     if table:
         out.append(table_html(table))
-    if out and out[-1] == "__OPEN_DETAILS__":
-        out[-1] = "</div></details>"
-    body = "".join(x for x in out if x != "__OPEN_DETAILS__")
+    if in_code:
+        out.append("</pre>")
+    if open_details:
+        out.append("</div></details>")
+    body = "".join(out)
     return ("<!doctype html><html><head><meta charset='utf-8'>"
             f"<title>{H.escape(title)}</title><style>{STYLE}</style></head>"
             f"<body><div class='wrap'>{body}"

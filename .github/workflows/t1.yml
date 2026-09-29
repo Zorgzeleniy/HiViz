@@ -16,8 +16,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - name: fake harness markers (so the installer has something to install into)
-        run: mkdir -p ~/.claude ~/.omp/agent/skills
       - name: node syntax + T-key parity
         run: |
           node --check bin/hiviz.js

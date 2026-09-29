@@ -14,7 +14,7 @@
 
 </a>
 
-<a href="#-quick-start"><img src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex_·_omp_·_Cursor_·_Windsurf_·_OpenCode-blue?style=flat-square" alt="6 harnesses">
+<a href="#-quick-start"><img src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex_·_omp_·_pi_·_Cursor_·_Windsurf_·_OpenCode-blue?style=flat-square" alt="7 harnesses">
 
 </a>
 
@@ -193,7 +193,7 @@ npx @zorgzeleniy/hiviz init
 
 ### 🕐 The first five minutes
 
-1. **Run the audit.** `/hv-audit` (Claude Code, Codex) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule / conflict — with a recommendation each.
+1. **Run the audit.** `/hv-audit` (Claude Code, OpenCode), the `hv-audit` skill (Codex, omp, pi, Cursor, Windsurf) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule / conflict — with a recommendation each.
 2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / merge. HiViz never decides for you — analysis and action are separate sessions, on purpose.
 3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule. A probe that fails restores the line from backup.
 4. **Check drift.** `/hv-drift` diffs your facts registry against the live machine — milliseconds, no LLM, and half of real-world findings.
@@ -251,17 +251,24 @@ Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/202609
 ## Commands
 
 
-| Command (Claude Code / Codex) | What it does                                                                                    |
+| Command / skill               | What it does                                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------------------------------- |
 | `/hv-audit`                   | 5-category revision of your instruction corpus → report + decisions file (you decide)           |
 | `/hv-apply`                   | executes exactly your decisions: backups, edits, ledger, probes that quote every surviving rule |
 | `/hv-drift`                   | facts-vs-environment diff: which standing facts are STALE                                       |
-| `/hv-test`                    | constitution tests: prove rules are LIVE in fresh sessions                                      |
-| `/hv-translate`               | migrate the corpus between harnesses (omp↔Claude↔Codex↔Cursor), probe-checked equivalence       |
+| `/hv-test` (`hv-constitution`) | constitution tests: prove rules are LIVE in fresh sessions                                     |
+| `/hv-translate`               | migrate the corpus between harnesses (any of the 7 ↔ any), probe-checked equivalence            |
 | `/hv-blame`                   | provenance for any instruction line: ledger + session-log mining — who wrote it, when, why      |
 
 
-omp: all five install as skills and auto-trigger on plain asks (*"audit my prompt debt"*) — they wake when you ask, never on their own. Cursor / Windsurf / OpenCode: a single audit adapter (audit + apply). Engines: `~/.hiviz/engines` (python stdlib, zero dependencies).
+| Harness     | Installed as                                                                  |
+| ----------- | ----------------------------------------------------------------------------- |
+| Claude Code | slash commands in `$CLAUDE_CONFIG_DIR/commands` (default `~/.claude`)         |
+| OpenCode    | slash commands in `~/.config/opencode/commands` + the shared skills           |
+| omp         | skills in `~/.omp/agent/skills`                                               |
+| Codex · pi · Cursor · Windsurf | skills in the cross-agent `~/.agents/skills` (one copy serves all) |
+
+Skills auto-trigger on plain asks (*"audit my prompt debt"*) — they wake when you ask, never on their own. Session-log mining (blame, MCP usage) reads omp, pi, Claude Code and Codex histories; `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `PI_CODING_AGENT_DIR` are honored. Engines: `~/.hiviz/engines` (python stdlib, zero dependencies).
 
 ### Where things live
 
@@ -277,7 +284,7 @@ After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift 
 - uses: Zorgzeleniy/hiviz@main
 ```
 
-That's the whole step: it installs the engines and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). Constitution probes need a live agent, so those stay a local/agent-CLI concern, not CI.
+That's the whole step: it runs the drift engine bundled in the action (no npm, no network) and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). Constitution probes need a live agent, so those stay a local/agent-CLI concern, not CI.
 
 ---
 

@@ -4,7 +4,8 @@
 Answers: when was this line written, by which model, in which session, why
 (ledger), and is it still verified (constitution). Sources, in order of trust:
   1. .hiviz/ledger.jsonl — entries written by hiviz ingest/apply
-  2. harness session logs  — mined edit/write tool calls (omp: ~/.omp/agent/sessions)
+  2. harness session logs — mined edit/write tool calls from omp, pi, Claude Code
+     and Codex JSONL histories (default dirs below, or --sessions)
 
 Stdlib only. Read-only.
 """
@@ -12,14 +13,34 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import sys
 from pathlib import Path
 
-EDIT_TOOLS = {"edit", "write", "Edit", "Write"}
+EDIT_TOOLS = {"edit", "write", "Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch", "multi_edit"}
+SHELL_TOOLS = {"shell", "local_shell", "exec_command", "bash", "Bash"}  # count only when running a patch
+META_KEYS = ('"model_change"', '"session_info"', '"turn_context"', '"session_meta"',
+             '"type":"session"', '"type": "session"', '"type":"summary"', '"type": "summary"')
+
+
+def _env_dir(var: str, default: Path) -> Path:
+    v = os.environ.get(var, "").strip()
+    return Path(v).expanduser() if v else default
+
+
+def default_sessions() -> list[Path]:
+    home = Path.home()
+    codex = _env_dir("CODEX_HOME", home / ".codex")
+    return [home / ".omp/agent/sessions", *sorted(home.glob(".omp/profiles/*/agent/sessions")),
+            _env_dir("PI_CODING_AGENT_DIR", home / ".pi/agent") / "sessions",
+            _env_dir("CLAUDE_CONFIG_DIR", home / ".claude") / "projects",
+            codex / "sessions", codex / "archived_sessions"]
 
 
 def norm(p: str) -> str:
-    return p.replace("\\", "/").lower()
+    # collapses JSON-escaped Windows separators too (C:\\Users -> c:/users)
+    return re.sub(r"\\+", "/", p).lower()
 
 
 def load_ledger(path: Path | None, file_key: str, marker: str) -> list[dict]:
@@ -39,6 +60,41 @@ def load_ledger(path: Path | None, file_key: str, marker: str) -> list[dict]:
     return out
 
 
+def _as_text(v) -> str:
+    return v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
+
+
+def tool_calls(d: dict):
+    """Yield (tool name, payload text) for every tool call in one log entry.
+    Shapes: omp/pi message.content[toolCall].arguments · Claude Code
+    message.content[tool_use].input · Codex payload function_call/custom_tool_call."""
+    msg = d.get("message")
+    content = msg.get("content") if isinstance(msg, dict) else None
+    for it in content if isinstance(content, list) else []:
+        if isinstance(it, dict) and it.get("type") in ("toolCall", "tool_use"):
+            yield str(it.get("name", "")), _as_text(it.get("arguments", it.get("input")) or {})
+    p = d.get("payload")
+    if d.get("type") == "response_item" and isinstance(p, dict) and \
+            p.get("type") in ("function_call", "custom_tool_call", "local_shell_call"):
+        args = p.get("arguments", p.get("input", p.get("action")))
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)  # function_call arguments are a JSON string
+            except json.JSONDecodeError:
+                pass
+        yield str(p.get("name") or "shell"), _as_text(args or {})
+
+
+def _mentions(payload_norm: str, file_key: str, cwd: str) -> bool:
+    if file_key in payload_norm:
+        return True
+    base = norm(cwd).rstrip("/") if cwd else ""
+    if not base or not file_key.startswith(base + "/"):
+        return False
+    rel = file_key[len(base) + 1:]  # Codex patches name files relative to the session cwd
+    return re.search(r"(?<![\w./-])" + re.escape(rel) + r"(?![\w.-])", payload_norm) is not None
+
+
 def mine_sessions(sessions_dirs: list[Path], file_key: str, marker: str,
                   max_events: int = 50) -> list[dict]:
     """Return edit/write events touching the file (marker-flagged when payload
@@ -51,46 +107,51 @@ def mine_sessions(sessions_dirs: list[Path], file_key: str, marker: str,
                                 reverse=True))
     path_frag = file_key.rsplit("/", 1)[-1]  # basename prefilter keeps scan cheap
     for jf in files:
-        title, model = "", ""
+        title, model, cwd = "", "", ""
         try:
             fh = jf.open(encoding="utf-8", errors="replace")
         except OSError:
             continue
         with fh:
             for line in fh:
-                if '"toolCall"' not in line:
-                    if '"type": "session"' in line or '"type":"session"' in line:
-                        try:
-                            h = json.loads(line)
-                            title = h.get("title", "")
-                        except json.JSONDecodeError:
-                            pass
-                    elif '"model_change"' in line:
-                        try:
-                            m = json.loads(line)
-                            model = m.get("model", model)
-                        except json.JSONDecodeError:
-                            pass
-                    continue
-                if path_frag not in line.lower():
+                hit = path_frag in line.lower()
+                if not hit and not any(k in line for k in META_KEYS):
                     continue
                 try:
                     d = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                msg = d.get("message") or {}
-                for item in (msg.get("content") or []):
-                    if not isinstance(item, dict) or item.get("type") != "toolCall":
+                if not isinstance(d, dict):
+                    continue
+                t = d.get("type")
+                p = d.get("payload") if isinstance(d.get("payload"), dict) else {}
+                if t == "session":  # omp/pi header
+                    title, cwd = d.get("title") or title, d.get("cwd") or cwd
+                elif t == "session_info":  # pi /name
+                    title = d.get("name") or title
+                elif t == "summary":  # Claude Code
+                    title = d.get("summary") or title
+                elif t == "model_change":  # omp: model · pi: provider + modelId
+                    model = d.get("model") or "/".join(
+                        str(x) for x in (d.get("provider"), d.get("modelId")) if x) or model
+                elif t in ("session_meta", "turn_context"):  # Codex
+                    model, cwd = p.get("model") or model, p.get("cwd") or cwd
+                if not hit:
+                    continue
+                msg = d.get("message") if isinstance(d.get("message"), dict) else {}
+                line_model = msg.get("model")
+                if line_model and msg.get("provider"):
+                    line_model = f"{msg['provider']}/{line_model}"
+                line_cwd = d.get("cwd") or cwd  # Claude Code stamps cwd on every entry
+                for name, payload in tool_calls(d):
+                    if name not in EDIT_TOOLS and not (name in SHELL_TOOLS and "*** Begin Patch" in payload):
                         continue
-                    if item.get("name") not in EDIT_TOOLS:
-                        continue
-                    payload = json.dumps(item.get("arguments") or {}, ensure_ascii=False)
-                    if norm(file_key) not in norm(payload):
+                    if not _mentions(norm(payload), file_key, line_cwd):
                         continue
                     events.append({
                         "ts": d.get("timestamp", ""),
-                        "model": model or "?",
-                        "tool": item.get("name"),
+                        "model": line_model or model or "?",
+                        "tool": name,
                         "session": title or jf.stem[:24],
                         "touched_line": bool(marker) and marker in payload,
                     })
@@ -116,7 +177,8 @@ def main() -> int:
     ap.add_argument("--file", required=True)
     ap.add_argument("--line", type=int, default=None)
     ap.add_argument("--marker", default=None, help="text fragment identifying the line")
-    ap.add_argument("--sessions", action="append", default=None)
+    ap.add_argument("--sessions", action="append", default=None,
+                    help="session-log dir (repeatable; replaces the omp/pi/Claude/Codex defaults)")
     ap.add_argument("--ledger", default=None)
     ap.add_argument("--constitution", default=None)
     a = ap.parse_args()
@@ -133,7 +195,7 @@ def main() -> int:
         if 0 < a.line <= len(lines):
             marker = lines[a.line - 1].strip()
 
-    sessions = [Path(p) for p in (a.sessions or [str(Path.home() / ".omp/agent/sessions")])]
+    sessions = [Path(p) for p in a.sessions] if a.sessions else default_sessions()
     events = mine_sessions(sessions, file_key, marker)
     ledger = load_ledger(Path(a.ledger) if a.ledger else None, file_key, marker)
     verified = verified_from(Path(a.constitution) if a.constitution else None, marker)

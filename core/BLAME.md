@@ -15,11 +15,14 @@ python <hiviz>/blame/blame.py --file <path> [--line N | --marker "text fragment"
 Sources, in order of trust:
 1. **ledger** (`.hiviz/ledger.jsonl`) — entries hiviz itself wrote during
    ingest/apply: `file · marker · written_at · model · reason · action`.
-2. **session logs** — mined `edit`/`write` tool calls from harness session
-   histories (omp: `~/.omp/agent/sessions/**/*.jsonl`; Claude Code:
-   `~/.claude/projects/**.jsonl` — pass the dir with `--sessions`). Events
-   carry timestamp, model (from `model_change` events), session title, and a
-   `TOUCHED THIS LINE` flag when the payload contains the marker text.
+2. **session logs** — mined edit/write/apply_patch tool calls from harness
+   session histories, all scanned by default: omp `~/.omp/agent/sessions`, pi
+   `~/.pi/agent/sessions`, Claude Code `~/.claude/projects`, Codex
+   `~/.codex/sessions` (`PI_CODING_AGENT_DIR` / `CLAUDE_CONFIG_DIR` / `CODEX_HOME`
+   honored; `--sessions <dir>` replaces the defaults). Events carry timestamp,
+   model, session title, and a `TOUCHED THIS LINE` flag when the payload
+   contains the marker text. Cursor, Windsurf and OpenCode keep no minable
+   JSONL history — rely on the ledger there.
 
 ## Interpretation
 

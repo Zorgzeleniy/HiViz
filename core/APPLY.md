@@ -1,6 +1,6 @@
 # HiViz Apply Procedure
 
-1. **Before-probes** (ask the user first; if the task brief explicitly pre-authorizes the probes, run them without asking). Each probe is one model call. For 1–3 rules marked `probe-worthy` in decisions, run a headless session of the CURRENT harness (`claude -p "…"` / `codex exec "…"` / `omp -p "…"` / `cursor-agent -p "…"`): "Without extra text: quote your directives about X." Save answers to `.hiviz/probes-before.md`.
+1. **Before-probes** (ask the user first; if the task brief explicitly pre-authorizes the probes, run them without asking). Each probe is one model call. For 1–3 rules marked `probe-worthy` in decisions, run a headless session of the CURRENT harness (`claude -p "…"` / `codex exec "…"` / `omp -p "…"` / `pi -p "…"` / `cursor-agent -p "…"` / `opencode run "…"`): "Without extra text: quote your directives about X." Save answers to `.hiviz/probes-before.md`.
 
 2. **Backups**: every file about to be edited → `<file>.bak-<YYYYMMDD>` next to it.
 3. **Apply exactly the approved edits.** Nothing of your own: no new lines, no reformatting of untouched lines, no improvements. Merges and relocations — precisely as decided.

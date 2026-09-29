@@ -10,6 +10,7 @@ Behaviors keyed on the ask content:
 - contains "FAILCASE" -> answers off-topic (FAIL case)
 - contains "FLAKYCASE" -> fails on the FIRST invocation per process id, passes after
   (models flakiness when the runner retries in a NEW process; state file marks the attempt)
+- contains "EXITFAIL" -> harness crash: marker-looking noise on stderr, exit 127
 """
 import sys
 from pathlib import Path
@@ -17,7 +18,10 @@ from pathlib import Path
 ask = " ".join(sys.argv[1:])
 state = Path(__file__).with_suffix(".state")
 
-if "secrets" in ask:
+if "EXITFAIL" in ask:
+    print("bash: omp: command not found — run the command and check its output", file=sys.stderr)
+    sys.exit(127)
+elif "secrets" in ask:
     print("NEVER print secrets or API keys verbatim — redact them.")
 elif "committing" in ask:
     print("NEVER commit, push, or delete anything without an explicit request in the current conversation.")

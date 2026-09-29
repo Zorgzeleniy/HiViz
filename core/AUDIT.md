@@ -14,11 +14,13 @@ or profile session must never audit surfaces it does not own.
 
 Find the user's persistent instruction files (existing files only — never invent paths):
 
-- Claude Code: `CLAUDE.md` (user `~/.claude/CLAUDE.md`, project root, nested), `.claude/skills/*/SKILL.md`, `.claude/agents/*.md`, `.claude/settings.json` hooks, `.mcp.json`
-- Codex: `~/.codex/AGENTS.md`, repo `AGENTS.md`, `~/.codex/skills/*/SKILL.md`, `~/.codex/prompts/*.md`, `[mcp_servers]` in `~/.codex/config.toml`
+- Claude Code (`~/.claude` = `$CLAUDE_CONFIG_DIR` when set): `CLAUDE.md` (user `~/.claude/CLAUDE.md`, project root, nested), `.claude/skills/*/SKILL.md`, `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json` hooks, `.mcp.json`, `mcpServers` in `~/.claude.json`
+- Codex (`~/.codex` = `$CODEX_HOME` when set): `~/.codex/AGENTS.md`, repo `AGENTS.md`, `~/.agents/skills/*/SKILL.md` + `.agents/skills/` (legacy: `~/.codex/skills/`, deprecated `~/.codex/prompts/*.md`), `[mcp_servers]` in `~/.codex/config.toml`
 - omp (ACTIVE profile only): its `AGENTS.md`, `RULES.md`, skills dirs from its `customDirectories`, `agents/*.md`, `rules/*.md`, `mcp.json`
-- Cursor: `.cursorrules`, `.cursor/rules/*.mdc`
-- OpenCode: `AGENTS.md`, `~/.config/opencode/`
+- pi (`~/.pi/agent` = `$PI_CODING_AGENT_DIR` when set): `~/.pi/agent/AGENTS.md`, `SYSTEM.md` / `APPEND_SYSTEM.md` (global and `.pi/`), `~/.pi/agent/skills/`, `~/.agents/skills/`, `.pi/skills/`, `~/.pi/agent/prompts/*.md`, repo `AGENTS.md`/`CLAUDE.md` (pi has no MCP)
+- Cursor: `.cursor/rules/**/*.mdc`, legacy `.cursorrules`, `AGENTS.md`, `~/.cursor/skills/` + `~/.agents/skills/`, `~/.cursor/mcp.json` + `.cursor/mcp.json`
+- Windsurf: `~/.codeium/windsurf/memories/global_rules.md`, `.windsurf/rules/*.md`, legacy `.windsurfrules`, `~/.codeium/windsurf/skills/` + `~/.agents/skills/`, `~/.codeium/windsurf/mcp_config.json`
+- OpenCode: `AGENTS.md`, `~/.config/opencode/` (`AGENTS.md`, `commands/`, `skills/`, `mcp` in `opencode.json[c]`), `~/.agents/skills/`
 - Universal (project-local): `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`
 
 ## Phase 1 — Deterministic pre-pass (no LLM judgment)

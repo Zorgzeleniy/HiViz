@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// hiviz — uniform installer for Claude Code / Codex / omp / Cursor / Windsurf / OpenCode adapters.
+// hiviz — uniform installer for Claude Code / Codex / omp / pi / Cursor / Windsurf / OpenCode adapters.
 // Zero dependencies. Renders adapters from core/ + templates/ so all harnesses share one source of truth.
 "use strict";
 const fs = require("fs");
@@ -15,11 +15,25 @@ const TESTS = read("core/TESTS.md");
 const BLAME = read("core/BLAME.md");
 const TRANSLATE = read("core/TRANSLATE.md");
 const render = (t) => t.replaceAll("{{AUDIT_BODY}}", AUDIT).replaceAll("{{APPLY_BODY}}", APPLY).replaceAll("{{DRIFT_BODY}}", DRIFT).replaceAll("{{TESTS_BODY}}", TESTS).replaceAll("{{BLAME_BODY}}", BLAME).replaceAll("{{TRANSLATE_BODY}}", TRANSLATE);
+
 const HOME = os.homedir();
+const envDir = (name, fallback) => {
+  const v = (process.env[name] || "").trim();
+  return v ? path.resolve(v.replace(/^~(?=$|[\\/])/, HOME)) : fallback;
+};
+const CLAUDE_DIR = envDir("CLAUDE_CONFIG_DIR", path.join(HOME, ".claude"));
+const CODEX_DIR = envDir("CODEX_HOME", path.join(HOME, ".codex"));
+const PI_DIR = envDir("PI_CODING_AGENT_DIR", path.join(HOME, ".pi", "agent"));
+const XDG_CONFIG = envDir("XDG_CONFIG_HOME", path.join(HOME, ".config"));
+const OMP_DIR = path.join(HOME, ".omp", "agent");
+// Cross-agent skills root: Codex, pi, Cursor, Windsurf and OpenCode all read it (omp dedups it
+// against its native dir), so one copy serves them all without duplicate skill names.
+const AGENTS_SKILLS = path.join(HOME, ".agents", "skills");
 
 function harnesses() {
   const T = {
     skill: read("templates/skill.md"),
+    skillApply: read("templates/skill-apply.md"),
     skillDrift: read("templates/skill-drift.md"),
     skillConstitution: read("templates/skill-constitution.md"),
     skillBlame: read("templates/skill-blame.md"),
@@ -30,62 +44,64 @@ function harnesses() {
     cmdTest: read("templates/command-test.md"),
     cmdBlame: read("templates/command-blame.md"),
     cmdTranslate: read("templates/command-translate.md"),
-    cursor: read("templates/cursor-rule.mdc"),
-    windsurf: read("templates/windsurf.md"),
-    opencode: read("templates/opencode.md"),
   };
+  const skills = (root) => [
+    ["hv-audit", render(T.skill)],
+    ["hv-apply", render(T.skillApply)],
+    ["hv-drift", render(T.skillDrift)],
+    ["hv-constitution", render(T.skillConstitution)],
+    ["hv-blame", render(T.skillBlame)],
+    ["hv-translate", render(T.skillTranslate)],
+  ].map(([name, content]) => [path.join(root, name, "SKILL.md"), content]);
+  const commands = (root) => [
+    ["hv-audit.md", render(T.cmdAudit)],
+    ["hv-apply.md", render(T.cmdApply)],
+    ["hv-drift.md", render(T.cmdDrift)],
+    ["hv-test.md", render(T.cmdTest)],
+    ["hv-blame.md", render(T.cmdBlame)],
+    ["hv-translate.md", render(T.cmdTranslate)],
+  ].map(([rel, content]) => [path.join(root, rel), content]);
+  const shared = skills(AGENTS_SKILLS);
   return [
+    { id: "claude", name: "Claude Code", marker: CLAUDE_DIR, targets: commands(path.join(CLAUDE_DIR, "commands")) },
+    { id: "codex", name: "Codex", marker: CODEX_DIR, targets: shared },
+    { id: "omp", name: "omp", marker: OMP_DIR, targets: skills(path.join(OMP_DIR, "skills")) },
+    { id: "pi", name: "pi", marker: PI_DIR, targets: shared },
+    { id: "cursor", name: "Cursor", marker: path.join(HOME, ".cursor"), targets: shared },
+    { id: "windsurf", name: "Windsurf", marker: path.join(HOME, ".codeium", "windsurf"), targets: shared },
     {
-      id: "claude", name: "Claude Code", marker: path.join(HOME, ".claude"),
-      targets: [
-        ["commands/hv-audit.md", render(T.cmdAudit)],
-        ["commands/hv-apply.md", render(T.cmdApply)],
-        ["commands/hv-drift.md", render(T.cmdDrift)],
-        ["commands/hv-test.md", render(T.cmdTest)],
-        ["commands/hv-blame.md", render(T.cmdBlame)],
-        ["commands/hv-translate.md", render(T.cmdTranslate)],
-      ].map(([rel, content]) => [path.join(HOME, ".claude", rel), content]),
-    },
-    {
-      id: "codex", name: "Codex", marker: path.join(HOME, ".codex"),
-      targets: [
-        ["prompts/hv-audit.md", render(T.cmdAudit)],
-        ["prompts/hv-apply.md", render(T.cmdApply)],
-        ["prompts/hv-drift.md", render(T.cmdDrift)],
-        ["prompts/hv-test.md", render(T.cmdTest)],
-        ["prompts/hv-blame.md", render(T.cmdBlame)],
-        ["prompts/hv-translate.md", render(T.cmdTranslate)],
-        ["skills/hv-audit/SKILL.md", render(T.skill)],
-      ].map(([rel, content]) => [path.join(HOME, ".codex", rel), content]),
-    },
-    {
-      id: "omp", name: "omp", marker: path.join(HOME, ".omp", "agent"),
-      targets: [
-        ["skills/hv-audit/SKILL.md", render(T.skill)],
-        ["skills/hv-drift/SKILL.md", render(T.skillDrift)],
-        ["skills/hv-constitution/SKILL.md", render(T.skillConstitution)],
-        ["skills/hv-blame/SKILL.md", render(T.skillBlame)],
-        ["skills/hv-translate/SKILL.md", render(T.skillTranslate)],
-      ].map(([rel, content]) => [path.join(HOME, ".omp", "agent", rel), content]),
-    },
-    {
-      id: "cursor", name: "Cursor", marker: path.join(HOME, ".cursor"),
-      targets: [[path.join(HOME, ".cursor", "rules", "hiviz.mdc"), render(T.cursor)]],
-    },
-    {
-      id: "windsurf", name: "Windsurf", marker: path.join(HOME, ".codeium", "windsurf"),
-      targets: [[path.join(HOME, ".codeium", "windsurf", "memories", "global_rules.md"), render(T.windsurf)]],
-    },
-    {
-      id: "opencode", name: "OpenCode", marker: path.join(HOME, ".config", "opencode"),
-      targets: [[path.join(HOME, ".config", "opencode", "command", "hiviz.md"), render(T.opencode)]],
+      id: "opencode", name: "OpenCode", marker: path.join(XDG_CONFIG, "opencode"),
+      targets: [...shared, ...commands(path.join(XDG_CONFIG, "opencode", "commands"))],
     },
   ];
+}
+
+// Adapters written by hiviz <= 0.7. Removed on init/uninstall; Windsurf's global_rules.md only
+// when hiviz wrote the whole file (it used to overwrite user rules).
+const LEGACY_WINDSURF_HEAD = "Audit standing instructions for prompt debt (stale facts, duplicates, relics, conflicts).";
+function legacyTargets() {
+  const out = ["hv-audit", "hv-apply", "hv-drift", "hv-test", "hv-blame", "hv-translate"]
+    .map((n) => path.join(CODEX_DIR, "prompts", `${n}.md`));
+  out.push(path.join(CODEX_DIR, "skills", "hv-audit"));
+  out.push(path.join(HOME, ".cursor", "rules", "hiviz.mdc"));
+  out.push(path.join(XDG_CONFIG, "opencode", "command", "hiviz.md"));
+  const ws = path.join(HOME, ".codeium", "windsurf", "memories", "global_rules.md");
+  if (fs.existsSync(ws) && fs.readFileSync(ws, "utf8").startsWith(LEGACY_WINDSURF_HEAD)) out.push(ws);
+  return out.filter((p) => fs.existsSync(p));
+}
+
+function removeLegacy(dry) {
+  for (const p of legacyTargets()) {
+    if (dry) { console.log(`  ~ would remove legacy ${path.relative(HOME, p)}`); continue; }
+    fs.rmSync(p, { recursive: true, force: true });
+    console.log(`  - removed legacy ${path.relative(HOME, p)}`);
+  }
 }
 
 function copyTree(src, dst, dry) {
   let wrote = 0;
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    if (e.name === "__pycache__") continue;
     const s = path.join(src, e.name), d = path.join(dst, e.name);
     if (e.isDirectory()) wrote += copyTree(s, d, dry);
     else {
@@ -109,49 +125,61 @@ function installEngines(dry) {
 const detected = () => harnesses().filter((h) => fs.existsSync(h.marker));
 
 function status() {
-  const all = harnesses();
-  if (!all.length) return console.log("no harness templates found (broken install?)");
   console.log("Harnesses on this machine:");
-  for (const h of all) {
+  for (const h of harnesses()) {
     const det = fs.existsSync(h.marker);
     const inst = h.targets.every(([p]) => fs.existsSync(p));
-    console.log(`  ${h.name.padEnd(12)} ${det ? "detected" : "not found"} · adapter ${inst ? "INSTALLED" : det ? "missing (run: hiviz init)" : "n/a"}`);
+    console.log(`  ${h.name.padEnd(12)} ${det ? "detected" : "not found"} · adapter ${!det ? "n/a" : inst ? "INSTALLED" : "missing (run: hiviz init)"}`);
   }
+  const legacy = legacyTargets();
+  if (legacy.length) console.log(`  legacy adapters from an older hiviz: ${legacy.length} (run: hiviz init to migrate)`);
 }
 
 function install(dry) {
   const list = detected();
-  if (!list.length) return console.log("No supported harness detected. Nothing to do.");
+  if (!list.length) console.log("No supported harness detected — installing the python engines only.");
+  // Shared targets (~/.agents/skills) are written once, labeled with every harness that reads them.
+  const plan = new Map();
   for (const h of list) {
     for (const [dest, content] of h.targets) {
-      if (fs.existsSync(dest) && fs.readFileSync(dest, "utf8") === content) {
-        console.log(`  = ${h.name}: up-to-date ${path.relative(HOME, dest)}`);
-        continue;
-      }
-      if (dry) { console.log(`  ~ ${h.name}: would write ${path.relative(HOME, dest)}`); continue; }
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.writeFileSync(dest, content);
-      console.log(`  + ${h.name}: wrote ${path.relative(HOME, dest)}`);
+      if (!plan.has(dest)) plan.set(dest, { content, names: [] });
+      plan.get(dest).names.push(h.name);
     }
   }
+  for (const [dest, { content, names }] of plan) {
+    const label = names.join("/");
+    if (fs.existsSync(dest) && fs.readFileSync(dest, "utf8") === content) {
+      console.log(`  = ${label}: up-to-date ${path.relative(HOME, dest)}`);
+      continue;
+    }
+    if (dry) { console.log(`  ~ ${label}: would write ${path.relative(HOME, dest)}`); continue; }
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, content);
+    console.log(`  + ${label}: wrote ${path.relative(HOME, dest)}`);
+  }
+  removeLegacy(dry);
   installEngines(dry);
   if (!dry) console.log(
-    "\nDone. Commands (Claude Code / Codex): /hv-audit, /hv-apply, /hv-drift, /hv-test, /hv-blame, /hv-translate.\n" +
-    "omp / Cursor / Windsurf / OpenCode: ask \"audit my prompt debt\" / \"check instruction drift\" / \"blame this line\".\n" +
+    "\nDone. Commands (Claude Code / OpenCode): /hv-audit, /hv-apply, /hv-drift, /hv-test, /hv-blame, /hv-translate.\n" +
+    "Skills (Codex / omp / pi / Cursor / Windsurf / OpenCode): hv-audit, hv-apply, hv-drift, hv-constitution, hv-blame, hv-translate —\n" +
+    "invoke by name or just ask \"audit my prompt debt\" / \"check instruction drift\" / \"blame this line\".\n" +
     "Python engines: ~/.hiviz/engines");
 }
 
 function uninstall() {
+  const seen = new Set();
   const rm = (p, label) => {
     const target = p.endsWith("SKILL.md") ? path.dirname(p) : p;  // skill = whole dir
+    if (seen.has(target)) return;
+    seen.add(target);
     if (fs.existsSync(target)) { fs.rmSync(target, { recursive: true, force: true }); console.log(`  - removed ${label} ${path.relative(HOME, target)}`); }
   };
   for (const h of harnesses()) {
     for (const [dest] of h.targets) rm(dest, h.name);
   }
-  for (const dir of [path.join(HOME, ".hiviz")]) {
-    if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); console.log("  - removed ~/.hiviz (engines)"); }
-  }
+  removeLegacy(false);
+  const eng = path.join(HOME, ".hiviz");
+  if (fs.existsSync(eng)) { fs.rmSync(eng, { recursive: true, force: true }); console.log("  - removed ~/.hiviz (engines)"); }
 }
 
 

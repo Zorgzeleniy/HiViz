@@ -1,0 +1,4 @@
+{"timestamp":"2026-09-05T10:00:00.000Z","type":"session_meta","payload":{"id":"cx1","cwd":"{{REPO}}","cli_version":"0.130.0"}}
+{"timestamp":"2026-09-05T10:00:01.000Z","type":"turn_context","payload":{"cwd":"{{REPO}}","model":"codex-test-model"}}
+{"timestamp":"2026-09-05T10:00:09.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","call_id":"c1","input":"*** Begin Patch\n*** Update File: tests/fixture/agent/AGENTS.md\n@@\n-old line\n+- Deploys go through `npm run deploy -- --profile=staging`; the staging gateway answers at 10.0.0.42 (legacy).\n*** End Patch\n"}}
+{"timestamp":"2026-09-05T10:00:20.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","call_id":"c2","input":"*** Begin Patch\n*** Update File: other/tests/fixture/agent/AGENTS.md\n@@\n+unrelated 10.0.0.42\n*** End Patch\n"}}
