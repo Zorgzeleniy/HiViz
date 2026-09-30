@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -19,7 +20,14 @@ EDIT_TOOLS = {"edit", "write", "Edit", "Write"}
 
 
 def norm(p: str) -> str:
-    return p.replace("\\", "/").lower()
+    # runs of backslashes collapse too: JSON-dumped Windows paths carry them doubled
+    return re.sub(r"\\+", "/", p).lower()
+
+
+def overlaps(a: str, b: str) -> bool:
+    """--marker gives a fragment, --line gives the whole line: match either way round."""
+    a, b = a.strip().lower(), b.strip().lower()
+    return bool(a and b) and (a in b or b in a)
 
 
 def load_ledger(path: Path | None, file_key: str, marker: str) -> list[dict]:
@@ -33,7 +41,7 @@ def load_ledger(path: Path | None, file_key: str, marker: str) -> list[dict]:
             continue
         if norm(e.get("file", "")) != file_key:
             continue
-        if marker and marker not in e.get("marker", e.get("text", "")):
+        if marker and not overlaps(marker, e.get("marker", e.get("text", ""))):
             continue
         out.append(e)
     return out
@@ -87,12 +95,14 @@ def mine_sessions(sessions_dirs: list[Path], file_key: str, marker: str,
                     payload = json.dumps(item.get("arguments") or {}, ensure_ascii=False)
                     if norm(file_key) not in norm(payload):
                         continue
+                    touched = bool(marker) and (
+                        marker in payload or json.dumps(marker, ensure_ascii=False)[1:-1] in payload)
                     events.append({
                         "ts": d.get("timestamp", ""),
                         "model": model or "?",
                         "tool": item.get("name"),
                         "session": title or jf.stem[:24],
-                        "touched_line": bool(marker) and marker in payload,
+                        "touched_line": touched,
                     })
                     if len(events) >= max_events:
                         events.sort(key=lambda e: e["ts"])
@@ -108,7 +118,13 @@ def verified_from(constitution_json: Path | None, marker: str) -> list[dict]:
         rows = json.loads(constitution_json.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return []
-    return [r for r in rows if marker.lower() in (r.get("guards") or "").lower()]
+    out = []
+    for r in rows:
+        guards = r.get("guards") or ""
+        m = re.search(r"`([^`]+)`", guards)
+        if overlaps(marker, m.group(1) if m else guards):
+            out.append(r)
+    return out
 
 
 def main() -> int:
@@ -147,7 +163,7 @@ def main() -> int:
             print(f"  ledger:    {e.get('written_at', '?')} · {e.get('model', '?')} · "
                   f"reason: {e.get('reason', '?')} · action: {e.get('action', '?')}")
     else:
-        print("  ledger:    (no entry — pre-tool history only)")
+        print("  ledger:    (no entry — pre-hiviz history only)")
     if events:
         print(f"  history:   {len(events)} edit/write event(s) in session logs")
         for e in events[-5:]:

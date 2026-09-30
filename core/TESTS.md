@@ -13,7 +13,8 @@ python <hiviz>/constitution/run.py --tests .hiviz/tests --corpus <repo-or-profil
 Verdicts: `PASS` · `FAIL` (markers absent from the answer — the rule stopped
 binding) · `FLAKY` (failed once, passed on retry — reported, does not fail CI)
 · `ORPHANED` (the guarded line is gone from the corpus — update the test, do
-not panic) · `ERROR` (runner broke).
+not panic) · `ERROR` (harness timed out / exited non-zero / did not start, or
+the test has nothing to check).
 
 Exit code: 0 all green · 1 any FAIL/ERROR. Each probe = one model call (+1 on retry).
 
@@ -26,10 +27,18 @@ for it in `.hiviz/tests/<id>.toml`:
 id = "my-rule"
 severity = "critical|normal"
 guards = "<file>: <line marker in backticks>"
+guards_needle = "<corpus text>"             # optional: what ORPHANED searches for, when the marker is a label
 ask = "Without extra text: quote your directives about <topic>."
 must_include_any = ["marker regex", ...]   # at least one must appear in the answer
 must_not_match = ["forbidden regex", ...]  # e.g. actual secret patterns
 ```
+
+Without `must_include_any` / `must_not_match`, the answer must quote the guarded
+marker (`guards_needle`, else the backticked part of `guards`).
+
+`--harness` is a command template; `{ask}` is substituted per argument and the
+command runs without a shell, so the ask is passed verbatim (no pipes/redirects
+in the template).
 
 Keep `ask` indirect (about the topic, not the exact wording) — the test checks
 that the RULE binds, not that the file echoes.

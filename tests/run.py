@@ -45,15 +45,18 @@ def t1() -> None:
 
     first = sh(["node", "bin/hiviz.js", "init"])
     second = sh(["node", "bin/hiviz.js", "init"])
-    check("installer idempotent", first.returncode == 0 and second.returncode == 0
-          and " + " not in second.stdout, "second run adds nothing")
-
-    installed = [HOME / ".claude/skills/hv-audit/SKILL.md",
-                 HOME / ".omp/agent/skills/hv-audit/SKILL.md"]
+    installed = [HOME / ".claude/commands/hv-audit.md",
+                 HOME / ".codex/prompts/hv-audit.md",
+                 HOME / ".omp/agent/skills/hv-audit/SKILL.md",
+                 HOME / ".cursor/rules/hiviz.mdc",
+                 HOME / ".codeium/windsurf/skills/hiviz/SKILL.md",
+                 HOME / ".config/opencode/command/hiviz.md"]
     installed = [p for p in installed if p.exists()]
     bad = [str(p) for p in installed if "{{" in p.read_text(encoding="utf-8")]
     check("adapters rendered (no placeholders)", bool(installed) and not bad,
           f"{len(installed)} adapters" + (f", unrendered: {bad}" if bad else ""))
+    check("installer idempotent", first.returncode == 0 and second.returncode == 0
+          and " + " not in second.stdout, "second run adds nothing")
     eng = HOME / ".hiviz/engines/core/AUDIT.md"
     check("installer deploys engines", eng.exists() and
           eng.read_text(encoding="utf-8") == (REPO / "core/AUDIT.md").read_text(encoding="utf-8"),
@@ -107,29 +110,32 @@ def t1() -> None:
         v = {r["id"]: r["verdict"] for r in crows}
         c_ok = (v.get("pass-secrets") == "PASS" and v.get("pass-commit") == "PASS"
                 and v.get("pass-language") == "PASS" and v.get("fail-offtopic") == "FAIL"
-                and v.get("flaky-once") == "FLAKY" and v.get("orphaned-gone") == "ORPHANED")
+                and v.get("flaky-once") == "FLAKY" and v.get("orphaned-gone") == "ORPHANED"
+                and v.get("error-crash") == "ERROR")
         cdetail = f"verdicts: {v}"
     check("constitution: all verdict classes produced", c_ok, cdetail)
-    fx = OUT / "blame_fx"
-    shutil.rmtree(fx, ignore_errors=True)
-    (fx / "sessions").mkdir(parents=True, exist_ok=True)
-    repo_abs = str(REPO.resolve()).replace("\\", "/")
-    src = REPO / "tests/fixture/blame/sessions"
-    for jf in sorted(src.rglob("*.jsonl")):
-        dst = fx / "sessions" / jf.relative_to(src)
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_text(jf.read_text(encoding="utf-8").replace("{{REPO}}", repo_abs), encoding="utf-8")
-    led_path = fx / "ledger.jsonl"
-    led_path.write_text((REPO / "tests/fixture/blame/ledger.jsonl").read_text(encoding="utf-8")
-                        .replace("{{REPO}}", repo_abs), encoding="utf-8")
-    b = sh([sys.executable, "blame/blame.py", "--file", "tests/fixture/agent/AGENTS.md",
-           "--marker", "10.0.0.42", "--sessions", str(fx / "sessions"),
-           "--ledger", str(led_path),
-           "--constitution", "tests/fixture/blame/constitution.json"])
-    b_ok = b.returncode == 0 and all(s in (b.stdout or "") for s in
-                                     ["zai/glm-test-model", "TOUCHED THIS LINE", "fixture plant"])
-    check("blame: ledger + mined history + line-touch flag", b_ok,
-          ((b.stdout or "").splitlines() or [""])[0][:100])
+    # blame fixtures hold absolute paths (as real ledgers/sessions do): render them for this checkout
+    bdir = OUT / "blame"
+    shutil.rmtree(bdir, ignore_errors=True)
+    for src in (REPO / "tests/fixture/blame").rglob("*"):
+        if src.is_file():
+            dst = bdir / src.relative_to(REPO / "tests/fixture/blame")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(src.read_text(encoding="utf-8")
+                           .replace("{{REPO_BS}}", REPO.as_posix().replace("/", "\\\\"))
+                           .replace("{{REPO}}", REPO.as_posix()), encoding="utf-8")
+    gw_line = next(i for i, l in enumerate((REPO / "tests/fixture/agent/AGENTS.md")
+                   .read_text(encoding="utf-8").splitlines(), 1) if "10.0.0.42" in l)
+    b_out = []
+    for sel in (["--marker", "10.0.0.42"], ["--line", str(gw_line)]):
+        b = sh([sys.executable, "blame/blame.py", "--file", "tests/fixture/agent/AGENTS.md", *sel,
+                "--sessions", str(bdir / "sessions"), "--ledger", str(bdir / "ledger.jsonl"),
+                "--constitution", str(bdir / "constitution.json")])
+        b_out.append(b.stdout or "" if b.returncode == 0 else "")
+    b_ok = all(all(s in o for s in ["zai/glm-test-model", "TOUCHED THIS LINE", "fixture plant",
+                                    "2 edit/write event(s)"]) for o in b_out)
+    check("blame: ledger + mined history + line-touch flag (--marker and --line)", b_ok,
+          " | ".join((o.splitlines() or [""])[0][:60] for o in b_out))
 
     for sub in ["tr-omp", "tr-claude"]:
         shutil.rmtree(OUT / sub, ignore_errors=True)
@@ -223,9 +229,9 @@ def t2() -> None:
           f"{o}/decisions.md (DECISION column empty). Do NOT modify any audited file. "
           "Your final chat reply: one summary line only. English.")
     report = OUT / "report.md"
-    reuse = os.environ.get("EXUVIA_REUSE") == "1"
+    reuse = os.environ.get("HIVIZ_REUSE") == "1"
     if reuse and report.exists() and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
-        print("  [skip] reusing existing report.md (EXUVIA_REUSE=1)")
+        print("  [skip] reusing existing report.md (HIVIZ_REUSE=1)")
     else:
         r = sh(["omp", "--profile", "hiviz-test", "-p", audit_prompt], timeout=1500)
         (OUT / "audit-last-output.txt").write_text(

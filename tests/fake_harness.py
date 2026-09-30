@@ -10,6 +10,7 @@ Behaviors keyed on the ask content:
 - contains "FAILCASE" -> answers off-topic (FAIL case)
 - contains "FLAKYCASE" -> fails on the FIRST invocation per process id, passes after
   (models flakiness when the runner retries in a NEW process; state file marks the attempt)
+- contains "CRASHCASE" -> exits non-zero with a marker-bearing answer (ERROR case)
 """
 import sys
 from pathlib import Path
@@ -25,6 +26,9 @@ elif "language" in ask:
     print("- Answer in English by default.")
 elif "FAILCASE" in ask:
     print("The weather today is sunny with light winds.")
+elif "CRASHCASE" in ask:
+    print("redact")  # a crashed harness must not PASS just because stdout matched
+    sys.exit(3)
 elif "FLAKYCASE" in ask:
     if state.exists():
         print("NEVER print secrets or API keys verbatim — redact them.")

@@ -1,0 +1,5 @@
+id = "error-crash"
+severity = "normal"
+guards = "agent/RULES.md: `redact`"
+ask = "CRASHCASE probe"
+must_include_any = ["redact"]

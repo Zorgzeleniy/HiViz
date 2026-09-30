@@ -39,7 +39,7 @@ except ImportError:
 
 HOME = Path.home()
 INIT_PARAMS = {"protocolVersion": "2025-06-18", "capabilities": {},
-               "clientInfo": {"name": "hiviz-meter", "version": "0.6.0"}}
+               "clientInfo": {"name": "hiviz-meter", "version": "0.7.0"}}
 
 
 def discover_configs(explicit: list[str] | None) -> list[tuple[str, Path]]:
@@ -124,7 +124,9 @@ def stdio_tools_sync(cfg: dict, timeout: float) -> list:
 
 
 def http_tools_sync(cfg: dict, timeout: float) -> list:
-    headers = {"Content-Type": "application/json", "Accept": "application/json",
+    headers = {"Content-Type": "application/json",
+               # Streamable HTTP servers may answer as SSE and reject clients not accepting it
+               "Accept": "application/json, text/event-stream",
                **{k: v for k, v in (cfg.get("headers") or {}).items()}}
     url = cfg.get("url", "")
     for k, v in list(headers.items()):
@@ -137,12 +139,33 @@ def http_tools_sync(cfg: dict, timeout: float) -> list:
     def post(payload: dict) -> dict:
         r = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers)
         with urllib.request.urlopen(r, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8", "replace"))
+            sid = resp.headers.get("Mcp-Session-Id")
+            if sid:  # session id arrives as a response header, not in the JSON body
+                headers["Mcp-Session-Id"] = sid
+            body = resp.read().decode("utf-8", "replace")
+            if "id" not in payload:
+                return {}  # notification: 202, no body
+            if "text/event-stream" in (resp.headers.get("Content-Type") or ""):
+                for ln in body.splitlines():
+                    if ln.startswith("data:"):
+                        try:
+                            msg = json.loads(ln[5:].strip())
+                        except json.JSONDecodeError:
+                            continue
+                        if isinstance(msg, dict) and msg.get("id") == payload["id"]:
+                            return msg
+                raise RuntimeError("no JSON-RPC response in event stream")
+            return json.loads(body)
 
     res = post({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": INIT_PARAMS})
-    sid = ((res.get("result") or {}).get("headers") or {}).get("mcp-session-id")
-    if sid:
-        headers["mcp-session-id"] = sid
+    if "error" in res:
+        raise RuntimeError(str(res["error"].get("message", "rpc error"))[:120])
+    headers["MCP-Protocol-Version"] = (res.get("result") or {}).get(
+        "protocolVersion", INIT_PARAMS["protocolVersion"])
+    try:
+        post({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    except Exception:
+        pass  # lenient servers don't need it; strict ones would fail tools/list anyway
     res2 = post({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
     if "error" in res2:
         raise RuntimeError(str(res2["error"].get("message", "rpc error"))[:120])
@@ -175,7 +198,8 @@ def mine_usage(server_names: list[str], sessions_dirs: list[Path]) -> dict[str, 
     names (omp routes MCP through xd:// writes, claude through mcp__ toolCalls —
     both contain the prefix as a substring)."""
     out = {n: {"calls": 0, "last_used": None} for n in server_names}
-    frags = {f"mcp__{n}_": n for n in server_names}
+    # longest name first: `mcp__foo_bar_x` belongs to server foo_bar, not foo
+    frags = {f"mcp__{n}_": n for n in sorted(server_names, key=len, reverse=True)}
     files: list[Path] = []
     for d in sessions_dirs:
         if d.exists():

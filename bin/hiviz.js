@@ -74,7 +74,8 @@ function harnesses() {
     },
     {
       id: "windsurf", name: "Windsurf", marker: path.join(HOME, ".codeium", "windsurf"),
-      targets: [[path.join(HOME, ".codeium", "windsurf", "memories", "global_rules.md"), render(T.windsurf)]],
+      // a global skill, not memories/global_rules.md: that file is the user's own (and capped at 6k chars)
+      targets: [[path.join(HOME, ".codeium", "windsurf", "skills", "hiviz", "SKILL.md"), render(T.windsurf)]],
     },
     {
       id: "opencode", name: "OpenCode", marker: path.join(HOME, ".config", "opencode"),
@@ -121,7 +122,8 @@ function status() {
 
 function install(dry) {
   const list = detected();
-  if (!list.length) return console.log("No supported harness detected. Nothing to do.");
+  // engines are deployed regardless: headless/CI machines have no harness but still run the engines
+  if (!list.length) console.log("No supported harness detected — adapters skipped.");
   for (const h of list) {
     for (const [dest, content] of h.targets) {
       if (fs.existsSync(dest) && fs.readFileSync(dest, "utf8") === content) {

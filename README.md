@@ -274,10 +274,11 @@ In your project, `.hiviz/`: `report.md` + `decisions.md` (audit), `probes-*.md` 
 After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift gate runs keyless in any CI — zero-config as a GitHub Action:
 
 ```yaml
+- uses: actions/checkout@v4
 - uses: Zorgzeleniy/hiviz@main
 ```
 
-That's the whole step: it installs the engines and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). Constitution probes need a live agent, so those stay a local/agent-CLI concern, not CI.
+That's it: checkout, then the action — it runs the engines straight from the action ref (no npm install) and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). Constitution probes need a live agent, so those stay a local/agent-CLI concern, not CI.
 
 ---
 
