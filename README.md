@@ -7,6 +7,7 @@
 **Your agent's instruction files (`CLAUDE.md`, `AGENTS.md`, skills, MCP configs) rot. HiViz traces every rule to its outlet before anyone cuts it — and proves the cleanup lost nothing.**
 
 <a href="https://www.npmjs.com/package/@zorgzeleniy/hiviz"><img src="https://img.shields.io/npm/v/@zorgzeleniy/hiviz?style=flat-square&color=orange&label=npm" alt="hiviz on npm"></a>
+<a href="https://github.com/Zorgzeleniy/HiViz/actions/workflows/t1.yml"><img src="https://img.shields.io/github/actions/workflow/status/Zorgzeleniy/HiViz/t1.yml?style=flat-square&label=T1%20rig" alt="T1 rig"></a>
 <a href="https://github.com/Zorgzeleniy/HiViz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT"></a>
 <a href="#-quick-start"><img src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex_·_omp_·_pi_·_Cursor_·_Windsurf_·_OpenCode-blue?style=flat-square" alt="7 harnesses"></a>
 <img src="https://img.shields.io/badge/engines-python_stdlib-teal?style=flat-square" alt="stdlib only">
