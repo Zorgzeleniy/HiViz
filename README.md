@@ -20,17 +20,57 @@
 
 <div align="center">
 
-**[See it](#-see-it) · [Why](#-why-this-exists) · [Quick Start](#-quick-start) · [What it catches](#-what-it-catches) · [The Numbers](#-the-numbers) · [Commands](#commands) · [CI](#run-it-in-ci) · [What it never does](#-what-it-never-does) · [License](#-license)**
+**[Quick Start](#-quick-start) · [How it works](#-how-it-works) · [See it](#-see-it) · [What it catches](#-what-it-catches) · [Commands](#commands) · [The Numbers](#-the-numbers) · [Why](#-why-this-exists) · [CI](#run-it-in-ci) · [What it never does](#-what-it-never-does)**
 
 </div>
 
 ---
 
+## ⚡ Quick Start
+
+```bash
+npx @zorgzeleniy/hiviz init
+```
+
+Detects every supported agent on your machine, installs the commands and skills each one reads, and deploys the python engines to `~/.hiviz/engines`. Safe to re-run; `npx @zorgzeleniy/hiviz uninstall` removes only what it wrote (preview with `--dry`).
+
+**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all.
+
+**Or through your agent's own plugin manager** — same skills, engines bundled:
+
+| Harness     | Install                                                                      |
+| ----------- | ---------------------------------------------------------------------------- |
+| Claude Code | `/plugin marketplace add Zorgzeleniy/hiviz` → `/plugin install hiviz@hiviz`  |
+| omp         | `/marketplace add Zorgzeleniy/hiviz` → `/marketplace install hiviz@hiviz`    |
+| Codex       | `codex plugin marketplace add Zorgzeleniy/hiviz` → `codex plugin add hiviz@hiviz` |
+| pi          | `pi install npm:@zorgzeleniy/hiviz`                                          |
+
+Cursor, Windsurf and OpenCode: use `npx`. Where each harness gets what, env overrides and uninstall details: [docs/install.md](./docs/install.md).
+
+## 🕐 How it works
+
+1. **Run the audit.** `/hv-audit` (Claude Code, OpenCode), the `hv-audit` skill (Codex, omp, pi, Cursor, Windsurf) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule — conflicts flagged, a recommendation for each.
+2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / keep. HiViz never decides for you — analysis and action are separate sessions, on purpose.
+3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule. A probe that fails restores the line from backup.
+4. **Check drift.** `/hv-drift` diffs your facts registry against the live machine — milliseconds, no LLM.
+5. **Test your constitution.** `/hv-test` runs probe tests for your load-bearing rules. Run it before merging changes to instruction files — a FAIL means the change broke a rule's binding. Probes need an agent CLI, so they run locally or in a CI job that has one (the bundled GitHub Action runs drift only).
+
+---
+
 ## 🦺 See it
 
-Every agent accumulates instructions that outlived the truth. Here is a real `AGENTS.md` from an open-source repo — one of the 100 popular configs in the first academic AGENTS.md smells corpus ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)) — before and after hiviz, verbatim excerpts of what the apply actually produced:
+Every agent accumulates instructions that outlived the truth. Here is a real `AGENTS.md` from an open-source repo — julep-ai/julep, one of the 100 popular configs in the first academic AGENTS.md smells corpus ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)) — before and after one hiviz audit + apply.
 
-**Before** — 19,013 bytes, verbatim excerpts:
+**19,013 → 4,308 bytes (−77%), and every rule that mattered still binds:**
+
+```
+P1 generated   → alive — "Never manually edit generated files (`autogen/`) — they get overwritten" quoted
+P2 big changes → alive — ">300 LOC or >3 files — ask for confirmation before starting" quoted
+P3 AIDEV       → alive — "AIDEV-NOTE / AIDEV-TODO / AIDEV-QUESTION, ≤120 chars" quoted
+```
+
+<details>
+<summary><b>Before</b> — 19,013 bytes, verbatim excerpts</summary>
 
 ```
 # AGENTS.md. Julep AI
@@ -71,7 +111,10 @@ should follow this process to ensure clarity, correctness, and maintainability:
 
 The step-by-step workflow the model runs anyway, meta-advice the file gives to its own authors, naming conventions any model knows — and `src/ts-api`, a component the rest of the file calls `agents-api`.
 
-**After** — 4,308 bytes, verbatim excerpts:
+</details>
+
+<details>
+<summary><b>After</b> — 4,308 bytes, verbatim excerpts</summary>
 
 ```
 # AGENTS.md — Julep AI
@@ -101,17 +144,11 @@ poe test      # ward test --exclude .venv (pytest for integrations-service)
 
 Every golden rule, every safety gate, every working command, the TypeSpec and ward specifics, the AIDEV ritual — all still there, deduplicated.
 
-**19,013 → 4,308 bytes (−77%).** This very file then ran as the corpus arm in the [A/B benchmark](#-the-numbers) — real tasks, max effort, n=3: the cleaned arm cost **−13% to −29%** on three of four tasks (tx-kv, hardening, bug-hunt) and quality never dropped. On the fourth (a long synthesis task) the delta drowned in one bloated run — noise, not signal. And the corpus arm lost points the clean arm kept: twice it dropped the same exact-bytes format check that minimalism-flavored rules invite you to rush.
-
-```
-P1 generated   → alive — "Never manually edit generated files (`autogen/`) — they get overwritten" quoted
-P2 big changes → alive — ">300 LOC or >3 files — ask for confirmation before starting" quoted
-P3 AIDEV       → alive — "AIDEV-NOTE / AIDEV-TODO / AIDEV-QUESTION, ≤120 chars" quoted
-```
+</details>
 
 > **What's a probe?** The whole proof mechanism, in three sentences. HiViz opens a brand-new agent session in the background — no chat, just a question — and asks it to quote a rule ("what are your directives about secrets?"). If the fresh session still quotes the rule, the rule is alive, no matter which file it lives in. That's a probe; every "alive" above is one.
 
-> **Who is HiViz?** The one everybody calls by the vest. Comes in at 6:15, after the lazy senior left at 6:00 — working code, and a nest of wires under the desk that's been "temporary" for two years. He doesn't rewrite what the senior built. He traces what's still live, tags everything `live` / `dead` (the tags are yours to place, not his), and never throws anything out on the day he finds it. *The mess isn't stupid. It's just unmapped.*
+This very file then ran as the corpus arm in the field [A/B benchmark](#-the-numbers): the cleaned arm cost −13% to −29% on three of four tasks (tx-kv, hardening, bug-hunt) with no quality drop; on the fourth (real-jwt, a from-scratch implementation) it came out +43%, inside the run-to-run noise of n=3.
 
 ### It also catches things linters can't even see
 
@@ -121,18 +158,9 @@ P3 AIDEV       → alive — "AIDEV-NOTE / AIDEV-TODO / AIDEV-QUESTION, ≤120 c
 | status       | fact                | detail                                |
 |--------------|---------------------|---------------------------------------|
 | STALE        | v3-migration-done   | pattern not found                     |
-| STALE        | mcp:code-index      | 1,430 tokens/session, 0 calls ever    |
 | STALE        | legacy-runner-doc   | missing: docs/legacy-runner.md        |
 | UNVERIFIABLE | staging-credentials | no check defined                      |
 | OK           | deploy-command      | pattern found                         |
-```
-
-**Constitution tests** — rules that exist in the file but stopped *binding* the model:
-
-```
-PASS   commit-gate        "NEVER commit… without an explicit request" — quoted by a fresh session
-PASS   secrets-verbatim   "redact them" — quoted
-FLAKY  language-default   failed once, passed on retry — reported, not hidden
 ```
 
 **MCP footprint + usage** — what your MCP servers cost every session, and whether anything ever calls them:
@@ -145,68 +173,19 @@ FLAKY  language-default   failed once, passed on retry — reported, not hidden
 | context7   | claude/global |     2 | 4,596 |    989 |    48 | 2026-09-20 |
 ```
 
-Fourteen tools, 1,430 tokens, every single session, zero invocations ever. That number is the case for disabling it.
+Fourteen tools, 1,430 tokens, every single session, zero invocations ever. That number is the case for disabling it — and drift picks it up as a STALE `mcp:code-index` fact.
 
-## 🌍 Why this exists
+**Constitution tests** — rules that exist in the file but stopped *binding* the model:
 
-In July 2026, Anthropic engineers reported removing over 80% of Claude Code's system prompt for the newest models — coding evals didn't move. [OpenAI's current prompt guidance](https://developers.openai.com/api/docs/guides/prompt-guidance) says the same: don't carry over every instruction from an older prompt stack — legacy prompts over-specify the process, and with new models that **adds noise and narrows the solution path**.
-
-Meanwhile your `CLAUDE.md`, skills, subagents and MCP configs keep growing. Every "add a line to fix it" is a loan. The interest compounds as duplicates diverge and facts rot.
-
-Linters see file structure. HiViz sees the loop: **what the instructions claim vs what the machine says vs what the model actually does** — and closes all three gaps with evidence, not vibes. The taxonomy maps onto the first academic catalog of AGENTS.md smells ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)).
-
-A preregistered 4,643-run study put numbers on the mechanism ([arXiv 2608.01347](https://arxiv.org/abs/2608.01347)): prompt **length** is nearly free — verbose repetition measures \~1.0× — while phrases that **order extra work** are not. "Compare several approaches" multiplies reasoning 2.4–7.4× at zero correctness gain; certainty language ("make absolutely sure") inflates output up to 4.1×, buying re-verification loops, not success. The most dangerous line in your config isn't the verbose one — it's the *plausible wrong hint*: misleading architectural hints raised reasoning 2.61× — the costliest input defect measured — while irrelevant noise measured nearly free (1.03×). And the harness amplifies all of it: a heavy standing prefix replays those consequences every single turn.
-
----
-
-## 📈 It compounds
-
-Everything hiviz does leaves working material behind — and nothing gets lost between runs:
-
-- After an audit you keep the report, your decisions file, a facts checklist, and a change log. The next audit starts from them, not from zero.
-- Each audit mines your harness session logs for which MCP tools actually get called, and the ledger records where every instruction line came from. The longer you've been running agents, the better it can answer "is this instruction earning its tokens?"
-- When you switch tools (Claude Code → Codex → Cursor), it carries your instructions over and checks nothing got lost on the way.
-
-It starts as a linter. It grows into the history of every rule you approved, tested, and shed.
-
----
-
-## ⚡ Quick Start
-
-Detects every supported agent on your machine, installs the right adapter into each, deploys the python engines to `~/.hiviz/engines`. Safe to re-run.
-
-**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. Changed your mind: `npx @zorgzeleniy/hiviz uninstall`.
-
-```bash
-npx @zorgzeleniy/hiviz init
 ```
-
-**Or through your agent's own plugin manager** — same skills, engines bundled, updates via the harness:
-
-| Harness     | Install                                                                                        |
-| ----------- | ---------------------------------------------------------------------------------------------- |
-| Claude Code | `/plugin marketplace add Zorgzeleniy/hiviz` → `/plugin install hiviz@hiviz` (skills: `/hiviz:hv-audit` …) |
-| omp         | `/marketplace add Zorgzeleniy/hiviz` → `/marketplace install hiviz@hiviz`                       |
-| Codex       | `codex plugin marketplace add Zorgzeleniy/hiviz` → `codex plugin add hiviz@hiviz`               |
-| pi          | `pi install npm:@zorgzeleniy/hiviz`                                                            |
-| Cursor      | not listed in the Cursor Marketplace yet — use `npx` (Cursor reads `~/.agents/skills`); the repo already ships the listing manifests |
-
-OpenCode and Windsurf have no skills marketplace — use `npx`. `hiviz init` notices a plugin install and skips that harness, so you never get the skills twice.
-
-**Uninstall** (`npx @zorgzeleniy/hiviz uninstall`, preview with `--dry`) deletes only files hiviz wrote — each one is checked for the HiViz procedure heading — plus `~/.hiviz/engines`. It keeps your own files even when they sit in a hiviz skill dir, keeps `~/.hiviz/` when it holds your data (ledger, reports from an audit run in `$HOME`), never follows or removes symlinks, and prunes only the empty dirs it leaves behind. Plugin installs are removed with the harness's own command (`/plugin uninstall hiviz@hiviz`, `codex plugin remove hiviz@hiviz`, `pi remove npm:@zorgzeleniy/hiviz`); uninstall prints the right one.
-
-### 🕐 The first five minutes
-
-1. **Run the audit.** `/hv-audit` (Claude Code, OpenCode), the `hv-audit` skill (Codex, omp, pi, Cursor, Windsurf) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule — conflicts flagged, a recommendation for each.
-2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / keep. HiViz never decides for you — analysis and action are separate sessions, on purpose.
-3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule. A probe that fails restores the line from backup.
-4. **Check drift.** `/hv-drift` diffs your facts registry against the live machine — milliseconds, no LLM, and half of real-world findings.
-5. **Test your constitution.** `/hv-test` runs probe tests for your load-bearing rules. Run it before merging changes to instruction files — a FAIL means the change broke a rule's binding. Probes need an agent CLI, so they run locally or in a CI job that has one (the bundled GitHub Action runs drift only).
+PASS   commit-gate        "NEVER commit… without an explicit request" — quoted by a fresh session
+PASS   secrets-verbatim   "redact them" — quoted
+FLAKY  language-default   failed once, passed on retry — reported, not hidden
+```
 
 ---
 
 ## 🧩 What it catches
-
 
 | Smell                 | Example from the wild                                            | Caught by                                          |
 | --------------------- | ---------------------------------------------------------------- | -------------------------------------------------- |
@@ -218,42 +197,9 @@ OpenCode and Windsurf have no skills marketplace — use `npx`. `hiviz init` not
 | **Dead rule**         | safety line still in the file, overridden by a newer skill       | constitution FAIL (deleted line → ORPHANED)        |
 | **Lost origin**       | "who wrote this rule and why?"                                   | blame: ledger + session-log mining                 |
 
-
----
-
-## 📊 The Numbers
-
-An A/B shed-bench where arm A carries the full instruction corpus and arm B the cleaned one. Reproduce (needs the omp CLI and access to the model): `python bench/run_ab.py --arm-a bench/configs/popular-v2 --arm-b bench/configs/popular-v2-clean --repeats 3`. The tool's own deterministic test suite is separate: `python tests/run.py --t1` (free, seconds). Negative = cheaper for the cleaned arm B.
-
-```
-real tasks, glm-5.3 max effort (48 runs: 4 tasks × 2 configs × 2 arms × n=3)
-tasks ported from real projects: PyJWT suite subset, vendored real historical fixes
-
-bug-hunt     popular ███████ −36%    julep ███ −14%     ← stable, token-heavy turns
-tx-kv        popular ███ −12%        julep ███ −13%     ← reproduced on both configs
-real-jwt     popular ███ −12%        julep +noise*       ← one bloated run skews n=3
-harden       popular +noise*         julep █████ −29%
-
-typical cell −12% · 6 of 8 cells cheaper · block ≈ 5%
-quality: the corpus never won a single cell. Cleaning caused 0 quality regressions.
-  bug-hunt: clean arm hit 8/10 and 7/10 twice; corpus arm flat 6/10 — never passed.
-  tx-kv: both corpus arms dropped a point on the same exact-bytes WAL check; clean 10/10.
-```
-
-**A floor, not a ceiling.** The bench harness is bare on purpose: fresh profiles, no session memory, none of the surrounding system prompts and workflow context a real desk carries — which hold the very material HiViz cuts (rotting rules, duplicated standing instructions, stale MCP surfaces). Real setups start from a bigger pile, so the deltas above are a conservative lower bound on what a cleanup saves.
-
-Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/20260927-202620/results.md) · [popular: tx-kv](./bench/runs/20260928-122436/results.md) · [popular: harden](./bench/runs/20260928-113743/results.md) · [julep: jwt/bugfix](./bench/runs/20260927-225617/results.md) · [julep: tx-kv](./bench/runs/20260928-140558/results.md) · [julep: harden](./bench/runs/20260928-115634/results.md)
-
-| What                     | Measured on                                            | Result                                                                                         |
-| ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| **Translator roundtrip** | omp → neutral intermediate format → omp, probe-checked | first run **caught a line genuinely lost in migration** (2/3 → FAIL); after the fix, 3/3 green |
-
-<sub>A private case, not a benchmark — the maintainer's own desk after one cleanup: AGENTS.md −65% (3,362 → 1,180 B) · 17 low-quality skills removed · MCP surface 6 servers → 2, i.e. 4.0k → 2.4k tokens/session.</sub>
-
 ---
 
 ## Commands
-
 
 | Command / skill               | What it does                                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -264,15 +210,7 @@ Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/202609
 | `/hv-translate`               | migrate the corpus between harnesses (any of the 7 ↔ any), probe-checked equivalence            |
 | `/hv-blame`                   | provenance for any instruction line: ledger + session-log mining — who wrote it, when, why      |
 
-
-| Harness     | Installed as                                                                  |
-| ----------- | ----------------------------------------------------------------------------- |
-| Claude Code | slash commands in `$CLAUDE_CONFIG_DIR/commands` (default `~/.claude`)         |
-| OpenCode    | slash commands in `~/.config/opencode/commands` + the shared skills           |
-| omp         | skills in `~/.omp/agent/skills`                                               |
-| Codex · pi · Cursor · Windsurf | skills in the cross-agent `~/.agents/skills` (one copy serves all) |
-
-Skills auto-trigger on plain asks (*"audit my prompt debt"*) — they wake when you ask, never on their own. Session-log mining (blame, MCP usage) reads omp, pi, Claude Code and Codex histories; `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `PI_CODING_AGENT_DIR` are honored. Engines: `~/.hiviz/engines` (python stdlib, zero dependencies).
+Claude Code and OpenCode get them as slash commands; Codex, omp, pi, Cursor and Windsurf as skills that wake when you ask (*"audit my prompt debt"*), never on their own. Blame and MCP usage mine the session logs of omp, pi, Claude Code and Codex. Details: [docs/install.md](./docs/install.md).
 
 ### Where things live
 
@@ -280,7 +218,65 @@ In your project, `.hiviz/`: `report.md` + `decisions.md` (audit), `probes-*.md` 
 
 ---
 
-### Run it in CI
+## 📊 The Numbers
+
+An A/B shed-bench: arm A carries the full instruction corpus, arm B the cleaned one, same tasks, same model. **This is a field version of the bench — n=3 per cell, one model, one harness — so read it as an approximate direction, not a measurement.** Negative = cheaper for the cleaned arm.
+
+```
+field bench — glm-5.3 max effort, 48 runs: 4 tasks × 2 configs × 2 arms × n=3
+tasks ported from real projects: PyJWT suite subset, vendored real historical fixes
+cost of the cleaned arm B vs the corpus arm A, median of 3 runs
+
+bug-hunt     popular ███████ −36%    julep ███ −14%
+tx-kv        popular n/a †           julep ███ −13%
+real-jwt     popular n/a †           julep +43% ‡
+harden       popular +13% ‡          julep ██████ −29%
+
+4 of 6 measured cells cheaper · median cell −13.5% · █ ≈ 5%
+† one arm-B run came back without provider cost data — withheld until re-run
+‡ runs of the same arm differ up to 4× at n=3 — not separable from noise at this scale
+quality: the corpus arm never scored higher in any cell; cleaning caused 0 quality regressions.
+  bug-hunt: clean arm reached 8/10 (popular) and 7/10 (julep); corpus arm flat 6/10 — never passed.
+  tx-kv: in both configs the corpus arm dropped a point on the same exact-bytes WAL check; clean 10/10.
+```
+
+**A floor, not a ceiling.** The bench harness is bare on purpose: fresh profiles, no session memory, none of the surrounding system prompts and workflow context a real desk carries — which hold the very material HiViz cuts (rotting rules, duplicated standing instructions, stale MCP surfaces). Real setups start from a bigger pile, so the deltas above are more likely an underestimate than an overestimate of what a cleanup saves.
+
+Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/20260927-202620/results.md) · [popular: tx-kv](./bench/runs/20260928-122436/results.md) · [popular: harden](./bench/runs/20260928-113743/results.md) · [julep: jwt/bugfix](./bench/runs/20260927-225617/results.md) · [julep: tx-kv](./bench/runs/20260928-140558/results.md) · [julep: harden](./bench/runs/20260928-115634/results.md) · protocol and limitations: [bench/README.md](./bench/README.md)
+
+Reproduce (needs the omp CLI and access to the model): `python bench/run_ab.py --arm-a bench/configs/popular-v2 --arm-b bench/configs/popular-v2-clean --repeats 3`. The tool's own deterministic test suite is separate: `python tests/run.py --t1` (free, seconds).
+
+| What                     | Measured on                                            | Result                                                                                         |
+| ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| **Translator roundtrip** | omp → neutral intermediate format → omp, probe-checked | first run **caught a line genuinely lost in migration** (2/3 → FAIL); after the fix, 3/3 green |
+
+<sub>A private case, not a benchmark — the maintainer's own desk after one cleanup: AGENTS.md −65% (3,362 → 1,180 B) · 17 low-quality skills removed · MCP surface 6 servers → 2, i.e. 4.0k → 2.4k tokens/session.</sub>
+
+---
+
+## 🌍 Why this exists
+
+In July 2026, Anthropic engineers reported removing over 80% of Claude Code's system prompt for the newest models — coding evals didn't move. [OpenAI's current prompt guidance](https://developers.openai.com/api/docs/guides/prompt-guidance) says the same: don't carry over every instruction from an older prompt stack — legacy prompts over-specify the process, and with new models that **adds noise and narrows the solution path**.
+
+Meanwhile your `CLAUDE.md`, skills, subagents and MCP configs keep growing. Every "add a line to fix it" is a loan. The interest compounds as duplicates diverge and facts rot.
+
+Linters see file structure. HiViz sees the loop: **what the instructions claim vs what the machine says vs what the model actually does** — and closes all three gaps with evidence, not vibes. The taxonomy maps onto the first academic catalog of AGENTS.md smells ([arXiv 2606.15828](https://arxiv.org/abs/2606.15828)).
+
+A preregistered 4,643-run study put numbers on the mechanism ([arXiv 2608.01347](https://arxiv.org/abs/2608.01347)): prompt **length** is nearly free — verbose repetition measures \~1.0× — while phrases that **order extra work** are not. "Compare several approaches" multiplies reasoning 2.4–7.4× at zero correctness gain; certainty language ("make absolutely sure") inflates output up to 4.1×, buying re-verification loops, not success. The most dangerous line in your config isn't the verbose one — it's the *plausible wrong hint*: misleading architectural hints raised reasoning 2.61× — the costliest input defect measured — while irrelevant noise measured nearly free (1.03×). And the harness amplifies all of it: a heavy standing prefix replays those consequences every single turn.
+
+### It compounds
+
+Everything hiviz does leaves working material behind — and nothing gets lost between runs:
+
+- After an audit you keep the report, your decisions file, a facts checklist, and a change log. The next audit starts from them, not from zero.
+- Each audit mines your harness session logs for which MCP tools actually get called, and the ledger records where every instruction line came from. The longer you've been running agents, the better it can answer "is this instruction earning its tokens?"
+- When you switch tools (Claude Code → Codex → Cursor), it carries your instructions over and checks nothing got lost on the way.
+
+It starts as a linter. It grows into the history of every rule you approved, tested, and shed.
+
+---
+
+## Run it in CI
 
 After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift gate runs keyless in any CI — zero-config as a GitHub Action:
 
@@ -304,7 +300,12 @@ The five invariants are the product. Breaking any of them is a semver-major deci
 
 ---
 
+## 🦺 Who is HiViz
+
+The one everybody calls by the vest. Comes in at 6:15, after the lazy senior left at 6:00 — working code, and a nest of wires under the desk that's been "temporary" for two years. He doesn't rewrite what the senior built. He traces what's still live, tags everything `live` / `dead` (the tags are yours to place, not his), and never throws anything out on the day he finds it. *The mess isn't stupid. It's just unmapped.*
+
+---
+
 ## 📄 License
 
 MIT — see [LICENSE](./LICENSE). Vendored fixtures keep their own licenses: superpowers and anthropics/skills (`tests/fixture/vendor/`), PyJWT (`bench/tasks/`, MIT), and the benchmark corpora in `bench/configs/` (julep-ai/julep `AGENTS.md`, Apache-2.0; the others as listed in each `meta.toml`).
-
