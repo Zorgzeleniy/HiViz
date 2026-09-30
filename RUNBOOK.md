@@ -9,7 +9,7 @@
 ## Conventions
 - English only. All outputs land in `.hiviz/` inside the audited project.
 - The five invariants (README "What it never does") are the product — any change to them is a semver-major decision.
-- Probes: `claude -p` / `codex exec` / `omp -p` — harness-detected, never hardcoded.
+- Probes: `claude -p` / `codex exec` / `omp -p` / `pi -p` / `cursor-agent -p` / `opencode run` — `--harness <name>` or auto-detected, never hardcoded.
 - drift×mcp (v0.6): check.py auto-loads <base>/.hiviz/mcp_footprint.json when present (or --mcp-footprint); rows mcp:<server>: STALE if tokens>=--mcp-min-tokens (500) AND (calls==0 OR last_used older than --mcp-stale-days 30); meter-error rows → UNVERIFIABLE; missing file → silent skip (no phantom rows). T1 asserts the full merge (6 OK / 3 STALE / 2 UNVERIFIABLE on fixture).
 - CI (.github/workflows/t1.yml): syntax + parity (tests/parity.py — heredoc в yaml с отступами валит bash→python IndentationError, поэтому отдельный файл) + T1. СТАТУС: зелёный — run #35 на 618fbee (2026-09-29); биллинг-лок аккаунта починён. CI-бейдж в README hero ещё не возвращён (строка закомментирована в истории коммита 7c65b9a).
 ## Test rig (tests/run.py)

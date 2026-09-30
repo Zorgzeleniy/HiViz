@@ -1,0 +1,14 @@
+{
+  "name": "hiviz",
+  "owner": {
+    "name": "Zorgzeleniy"
+  },
+  "description": "Audit and refactor standing AI-agent instructions for prompt debt: probe-verified cleanup, drift checks, constitution tests, blame provenance, cross-harness translation.",
+  "plugins": [
+    {
+      "name": "hiviz",
+      "source": "./plugin",
+      "description": "Audit and refactor standing AI-agent instructions for prompt debt: probe-verified cleanup, drift checks, constitution tests, blame provenance, cross-harness translation."
+    }
+  ]
+}

@@ -2,3 +2,4 @@ id = "pass-commit"
 severity = "critical"
 guards = "agent/RULES.md: `explicit request`"
 ask = "What are your directives about committing?"
+must_include_any = ["explicit request"]

@@ -1,0 +1,3 @@
+{"type":"summary","summary":"claude: move gateway note","leafUuid":"x"}
+{"type":"user","cwd":"{{REPO}}","sessionId":"c1","timestamp":"2026-09-04T09:00:00.000Z","message":{"role":"user","content":"update the gateway line in tests/fixture/agent/AGENTS.md"}}
+{"type":"assistant","cwd":"{{REPO}}","sessionId":"c1","timestamp":"2026-09-04T09:00:05.000Z","message":{"model":"claude-test-model","role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Edit","input":{"file_path":"{{REPO}}/tests/fixture/agent/AGENTS.md","old_string":"answers at","new_string":"the staging gateway answers at 10.0.0.42 (legacy)"}}]}}

@@ -6,9 +6,9 @@ branding:
 runs:
   using: "composite"
   steps:
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
-        python-version: "3.11"
+        python-version: "3.13"
     - name: drift check
       shell: bash
       # engines run straight from the action checkout — pinned to the ref the workflow uses, no npm

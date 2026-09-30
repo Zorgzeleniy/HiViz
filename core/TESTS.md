@@ -5,16 +5,21 @@ rule is LIVE in a fresh session, not just present in a file.
 
 ## 1. Run the suite
 ```
-python <hiviz>/constitution/run.py --tests .hiviz/tests --corpus <repo-or-profile-root> [--out .hiviz/constitution.json]
+python <hiviz>/constitution/run.py --tests .hiviz/tests --corpus <repo-or-profile-root> [--harness <name>] [--out .hiviz/constitution.json]
 ```
 
-`<hiviz>` = the repo checkout or the installed engines dir (`~/.hiviz/engines`).
+`<hiviz>` = the hiviz engines dir, first that exists: `engines/` two levels above this skill's `SKILL.md` (plugin installs: `<skill dir>/../../engines`), `~/.hiviz/engines` (npm installer), or a hiviz repo checkout. It contains `drift/check.py`.
+
+`--harness` takes a name — `omp`, `pi`, `claude`, `codex`, `cursor`, `opencode` — or a
+command template with `{ask}`; pass the harness you are running in. Default `auto`:
+`$HIVIZ_HARNESS`, then Claude Code when `$CLAUDECODE` is set, then the first CLI found
+on PATH. The ask is passed as one argument, never through a shell.
 
 Verdicts: `PASS` · `FAIL` (markers absent from the answer — the rule stopped
 binding) · `FLAKY` (failed once, passed on retry — reported, does not fail CI)
 · `ORPHANED` (the guarded line is gone from the corpus — update the test, do
 not panic) · `ERROR` (harness timed out / exited non-zero / did not start, or
-the test has nothing to check).
+the test has nothing to check; only its stdout counts as the answer).
 
 Exit code: 0 all green · 1 any FAIL/ERROR. Each probe = one model call (+1 on retry).
 
@@ -31,6 +36,7 @@ guards_needle = "<corpus text>"             # optional: what ORPHANED searches f
 ask = "Without extra text: quote your directives about <topic>."
 must_include_any = ["marker regex", ...]   # at least one must appear in the answer
 must_not_match = ["forbidden regex", ...]  # e.g. actual secret patterns
+guards_needle = "exact text"               # optional: what to look for in the corpus instead of the backticked marker
 ```
 
 Without `must_include_any` / `must_not_match`, the answer must quote the guarded

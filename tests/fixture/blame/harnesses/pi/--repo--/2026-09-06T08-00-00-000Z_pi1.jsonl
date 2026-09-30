@@ -1,0 +1,4 @@
+{"type":"session","version":3,"id":"pi1","timestamp":"2026-09-06T08:00:00.000Z","cwd":"{{REPO}}"}
+{"type":"model_change","id":"a1","parentId":null,"timestamp":"2026-09-06T08:00:01.000Z","provider":"testprov","modelId":"pi-test-model"}
+{"type":"session_info","id":"a2","parentId":"a1","timestamp":"2026-09-06T08:00:02.000Z","name":"pi: gateway fix"}
+{"type":"message","id":"a3","parentId":"a2","timestamp":"2026-09-06T08:00:07.000Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"t1","name":"edit","arguments":{"path":"{{REPO}}/tests/fixture/agent/AGENTS.md","oldText":"answers at","newText":"answers at 10.0.0.42 (legacy)"}}]}}

@@ -14,11 +14,13 @@ or profile session must never audit surfaces it does not own.
 
 Find the user's persistent instruction files (existing files only — never invent paths):
 
-- Claude Code: `CLAUDE.md` (user `~/.claude/CLAUDE.md`, project root, nested), `.claude/skills/*/SKILL.md`, `.claude/agents/*.md`, `.claude/settings.json` hooks, `.mcp.json`
-- Codex: `~/.codex/AGENTS.md`, repo `AGENTS.md`, `~/.codex/skills/*/SKILL.md`, `~/.codex/prompts/*.md`, `[mcp_servers]` in `~/.codex/config.toml`
+- Claude Code (`~/.claude` = `$CLAUDE_CONFIG_DIR` when set): `CLAUDE.md` (user `~/.claude/CLAUDE.md`, project root, nested), `.claude/skills/*/SKILL.md`, `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json` hooks, `.mcp.json`, `mcpServers` in `~/.claude.json`
+- Codex (`~/.codex` = `$CODEX_HOME` when set): `~/.codex/AGENTS.md`, repo `AGENTS.md`, `~/.agents/skills/*/SKILL.md` + `.agents/skills/` (legacy: `~/.codex/skills/`, deprecated `~/.codex/prompts/*.md`), `[mcp_servers]` in `~/.codex/config.toml`
 - omp (ACTIVE profile only): its `AGENTS.md`, `RULES.md`, skills dirs from its `customDirectories`, `agents/*.md`, `rules/*.md`, `mcp.json`
-- Cursor: `.cursorrules`, `.cursor/rules/*.mdc`
-- OpenCode: `AGENTS.md`, `~/.config/opencode/`
+- pi (`~/.pi/agent` = `$PI_CODING_AGENT_DIR` when set): `~/.pi/agent/AGENTS.md`, `SYSTEM.md` / `APPEND_SYSTEM.md` (global and `.pi/`), `~/.pi/agent/skills/`, `~/.agents/skills/`, `.pi/skills/`, `~/.pi/agent/prompts/*.md`, repo `AGENTS.md`/`CLAUDE.md` (pi has no MCP)
+- Cursor: `.cursor/rules/**/*.mdc`, legacy `.cursorrules`, `AGENTS.md`, `~/.cursor/skills/` + `~/.agents/skills/`, `~/.cursor/mcp.json` + `.cursor/mcp.json`
+- Windsurf: `~/.codeium/windsurf/memories/global_rules.md`, `.windsurf/rules/*.md`, legacy `.windsurfrules`, `~/.codeium/windsurf/skills/` + `~/.agents/skills/`, `~/.codeium/windsurf/mcp_config.json`
+- OpenCode: `AGENTS.md`, `~/.config/opencode/` (`AGENTS.md`, `commands/`, `skills/`, `mcp` in `opencode.json[c]`), `~/.agents/skills/`
 - Universal (project-local): `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`
 
 ## Phase 1 — Deterministic pre-pass (no LLM judgment)
@@ -31,7 +33,7 @@ For every inventoried file compute:
 4. Dead references: every `skill://name`, `@path`, agent name — verify the target exists. **Resolve against the context that OWNS the audited file, not the auditing session**: for omp profiles, check the skills roots listed in THAT profile's `config.yml` (a reference valid where the file lives is NOT dead, even if the auditing session cannot load it). Only flag a reference dead when it resolves in none of the owning context's roots.
 5. Dated snapshots: regex `\d{4}-\d{2}-\d{2}` and version pins `\d+\.\d+(\.\d+)?` — list fact · date/version · age in days.
 6. Few-shot blocks: output examples / mock reports (```-blocks > 10 lines with fabricated data).
-7. Live MCP surfaces (requires python3): run `python <hiviz>/meters/mcp_footprint.py --out .hiviz/mcp_footprint.json`, where `<hiviz>` is the repo checkout or the installed engines dir (`~/.hiviz/engines`). Measures each unique server's standing context payload AND its actual usage mined from session logs — record per-server rows: server · tools · bytes · tokens · calls · last_used. Treat each server as an instruction surface; a server with a permanent token cost and `calls = 0` (or stale `last_used`) is a disable candidate backed by a number, not an opinion.
+7. Live MCP surfaces (requires python3): run `python <hiviz>/meters/mcp_footprint.py --out .hiviz/mcp_footprint.json`, where `<hiviz>` is the hiviz engines dir, first that exists: `engines/` two levels above this skill's `SKILL.md` (plugin installs: `<skill dir>/../../engines`), `~/.hiviz/engines` (npm installer), or a hiviz repo checkout. It contains `drift/check.py`. Measures each unique server's standing context payload AND its actual usage mined from session logs — record per-server rows: server · tools · bytes · tokens · calls · last_used. Treat each server as an instruction surface; a server with a permanent token cost and `calls = 0` (or stale `last_used`) is a disable candidate backed by a number, not an opinion.
 
 ## Phase 2 — Categorization (if two fit, name the dominant one)
 

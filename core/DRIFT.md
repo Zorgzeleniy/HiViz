@@ -8,7 +8,7 @@ procedure is deterministic-first: the machine judges, the model only drafts.
 python <hiviz>/drift/check.py --facts .hiviz/facts.toml --base <repo-or-profile-root>
 ```
 
-`<hiviz>` = the repo checkout or the installed engines dir (`~/.hiviz/engines`).
+`<hiviz>` = the hiviz engines dir, first that exists: `engines/` two levels above this skill's `SKILL.md` (plugin installs: `<skill dir>/../../engines`), `~/.hiviz/engines` (npm installer), or a hiviz repo checkout. It contains `drift/check.py`.
 
 Statuses: `OK` (fact holds) · `STALE` (fact contradicts the environment — this
 is prompt debt) · `UNVERIFIABLE` (no check defined) · `ERROR` (checker broke).

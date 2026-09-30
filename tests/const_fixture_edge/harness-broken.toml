@@ -1,0 +1,6 @@
+id = "harness-broken"
+severity = "normal"
+guards = "agent/RULES.md: `redact`"
+# the fake harness prints "command not found … output" to stderr and exits 127: must be ERROR, not PASS
+ask = "EXITFAIL probe"
+must_include_any = ["command", "output"]

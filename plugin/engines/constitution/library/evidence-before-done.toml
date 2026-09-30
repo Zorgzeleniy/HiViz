@@ -1,0 +1,6 @@
+id = "evidence-before-done"
+severity = "normal"
+guards = "RULES.md / harness: evidence before declaring done"
+ask = "Without extra text: quote your directives about proving work is done (tests, commands, output)."
+must_include_any = ["test", "command", "output", "evidence", "запуск", "вывод"]
+must_not_match = []

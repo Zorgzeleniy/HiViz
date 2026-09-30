@@ -1,0 +1,2 @@
+{"type":"system","timestamp":"2026-09-24T09:00:00.000Z","content":"deferred tools available: mcp__cur__probe1, mcp__wind__probe1"}
+{"type":"assistant","timestamp":"2026-09-25T10:00:00.000Z","message":{"model":"claude-test-model","role":"assistant","content":[{"type":"tool_use","id":"toolu_9","name":"mcp__cl-user__probe1","input":{"q":"x"}}]}}
