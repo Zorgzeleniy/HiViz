@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "hiviz",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Audit and refactor standing AI-agent instructions for prompt debt: probe-verified cleanup, drift checks, constitution tests, blame provenance, cross-harness translation.",
   "author": {
     "name": "Zorgzeleniy"
