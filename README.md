@@ -111,7 +111,7 @@ poe test      # ward test --exclude .venv (pytest for integrations-service)
 
 Every golden rule, every safety gate, every working command, the TypeSpec and ward specifics, the AIDEV ritual — all still there, deduplicated.
 
-**19,342 → 4,288 bytes (−78%).** This very file then ran as the corpus arm in the [A/B benchmark](#-the-numbers) — real tasks, max effort, n=3: the cleaned arm cost **−13% to −29%** on three of four tasks (tx-kv, hardening, bug-hunt) and quality never dropped. On the fourth (a long synthesis task) the delta drowned in one bloated run — noise, not signal. And the corpus arm lost points the clean arm kept: twice it dropped the same exact-bytes format check that minimalism-flavored rules invite you to rush.
+**19,342 → 4,288 bytes (−78%).** This very file then ran as the corpus arm in the [A/B benchmark](#-the-numbers) — real tasks, max effort, n=3: the cleaned arm cost **−13% to −29%** on three of four tasks (tx-kv, hardening, bug-hunt) and quality never dropped. On the fourth (real-jwt — a from-scratch PyJWT-compatible implementation) the raw delta drowned in one bloated run — trimmed, it is flat (+3%). And the corpus arm lost points the clean arm kept: twice it dropped the same exact-bytes format check that minimalism-flavored rules invite you to rush.
 
 ```
 P1 generated   → alive — "Never manually edit generated files (`autogen/`) — they get overwritten" quoted
@@ -227,8 +227,8 @@ tasks ported from real projects: PyJWT suite subset, vendored real historical fi
 
 bug-hunt     popular ███████ −36%    julep ███ −14%     ← stable, token-heavy turns
 tx-kv        popular ███ −12%        julep ███ −13%     ← reproduced on both configs
-real-jwt     popular ███ −12%        julep +noise*       ← one bloated run skews n=3
-harden       popular +noise*         julep █████ −29%
+real-jwt     popular ███ −12%        julep +3%*          ← excl. one 4× bloated run; raw median +43% (n=3)
+harden       popular +13%            julep █████ −29%
 
 typical cell −12% · 6 of 8 cells cheaper · block ≈ 5%
 quality: the corpus never won a single cell. Cleaning caused 0 quality regressions.

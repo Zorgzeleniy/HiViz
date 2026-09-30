@@ -7,11 +7,11 @@
 - `meters/` — v0.2: fixed `mcp_footprint` (live MCP context-cost meter) lands here.
 
 ## Conventions
-- English only. All outputs land in `.hiviz/` (legacy `.hiviz/` is read as fallback) inside the audited project.
+- English only. All outputs land in `.hiviz/` inside the audited project.
 - The five invariants (README "What it never does") are the product — any change to them is a semver-major decision.
 - Probes: `claude -p` / `codex exec` / `omp -p` — harness-detected, never hardcoded.
 - drift×mcp (v0.6): check.py auto-loads <base>/.hiviz/mcp_footprint.json when present (or --mcp-footprint); rows mcp:<server>: STALE if tokens>=--mcp-min-tokens (500) AND (calls==0 OR last_used older than --mcp-stale-days 30); meter-error rows → UNVERIFIABLE; missing file → silent skip (no phantom rows). T1 asserts the full merge (6 OK / 3 STALE / 2 UNVERIFIABLE on fixture).
-- CI (.github/workflows/t1.yml): syntax + parity (tests/parity.py — heredoc в yaml с отступами валит bash→python IndentationError, поэтому отдельный файл) + T1. СТАТУС: GitHub Actions залочен биллингом аккаунта ("account is locked due to a billing issue", job умирает за 3 c без шагов). После фикса в Settings→Billing вернуть CI-бейдж в README hero (строка закомментирована в истории коммита 7c65b9a).
+- CI (.github/workflows/t1.yml): syntax + parity (tests/parity.py — heredoc в yaml с отступами валит bash→python IndentationError, поэтому отдельный файл) + T1. СТАТУС: зелёный — run #35 на 618fbee (2026-09-29); биллинг-лок аккаунта починён. CI-бейдж в README hero ещё не возвращён (строка закомментирована в истории коммита 7c65b9a).
 ## Test rig (tests/run.py)
 - T1 deterministic (free): render, installer idempotency, engine deploy, meters, drift statuses, constitution engine via fake harness, blame card. Current: 9/9.
 - T2 E2E (LLM, glm-5.3-flash:high in sandbox profile with 21 vendored popular skills + realistic AGENTS.md): audit → recall → deterministic decisions → apply → post-asserts. Current best: 13/13 effective (12 PASS + recall-8/8 with paraphrase-robust markers), ~20 min.
