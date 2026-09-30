@@ -237,6 +237,8 @@ typical cell −12% · 6 of 8 cells cheaper · block ≈ 5%
 quality: the corpus arm never scored higher in any cell; cleaning caused 0 quality regressions.
   bug-hunt: clean arm reached 8/10 (popular) and 7/10 (julep); corpus arm flat 6/10 — never passed.
   tx-kv: in both configs the corpus arm dropped a point on the same exact-bytes WAL check; clean 10/10.
+corpus shrink (A → B): popular AGENTS.md 15,245 → 3,638 B (−76%) · julep 19,013 → 4,308 B (−77%)
+  popular's 17 skills (456.8 kB) ride both arms untouched — the audit cut the standing file, not the skill set
 ```
 
 **A floor, not a ceiling.** The bench harness is bare on purpose: fresh profiles, no session memory, none of the surrounding system prompts and workflow context a real desk carries — which hold the very material HiViz cuts (rotting rules, duplicated standing instructions, stale MCP surfaces). Real setups start from a bigger pile, so the deltas above are more likely an underestimate than an overestimate of what a cleanup saves.

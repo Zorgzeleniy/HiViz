@@ -28,6 +28,22 @@ def sh(cmd: list[str], cwd=None, timeout=2400, env=None):
                           encoding="utf-8", errors="replace", timeout=timeout, env=env)
 
 
+def skill_sources(corpus: Path) -> list[Path]:
+    dirs = set(corpus.glob("*skills*")) | set(corpus.glob("superpowers*")) | set(corpus.glob("*skills*/skills"))
+    return sorted(d for d in dirs if d.is_dir())
+
+
+def mounted_payload(corpus: Path) -> dict:
+    """Bytes of exactly what setup_profile mounts — the arm's standing instructions."""
+    md = next((corpus / n for n in ("CLAUDE.md", "AGENTS.md") if (corpus / n).exists()), None)
+    md_bytes = md.stat().st_size if md else 0
+    skills = [s for d in skill_sources(corpus) for s in sorted(d.iterdir())
+              if s.is_dir() and (s / "SKILL.md").exists()]
+    skills_bytes = sum(f.stat().st_size for s in skills for f in s.rglob("*") if f.is_file())
+    return {"standing_file_bytes": md_bytes, "skills": len(skills),
+            "skills_bytes": skills_bytes, "total_bytes": md_bytes + skills_bytes}
+
+
 def setup_profile(name: str, corpus: Path, model: str) -> Path:
     prof = HOME / ".omp/profiles" / name / "agent"
     if prof.parent.exists():
@@ -36,9 +52,7 @@ def setup_profile(name: str, corpus: Path, model: str) -> Path:
     src_md = next((corpus / n for n in ("CLAUDE.md", "AGENTS.md") if (corpus / n).exists()), None)
     if src_md is not None:
         (prof / "AGENTS.md").write_text(src_md.read_text(encoding="utf-8"), encoding="utf-8")
-    for d in sorted(set(corpus.glob("*skills*")) | set(corpus.glob("superpowers*")) | set(corpus.glob("*skills*/skills"))):
-        if not d.is_dir():
-            continue
+    for d in skill_sources(corpus):
         for s in sorted(d.iterdir()):
             if s.is_dir() and (s / "SKILL.md").exists():
                 shutil.copytree(s, prof / "skills" / f"{d.name}-{s.name}")
@@ -179,7 +193,7 @@ def aggregate(rows: list[dict]) -> list[dict]:
     return agg
 
 
-def render_results(agg: list[dict], raw: list[dict]) -> str:
+def render_results(agg: list[dict], raw: list[dict], payloads: dict | None = None) -> str:
     lines = ["# Shed-Bench Results", "",
              "| arm | task | pass | score | wall (med) | tok in (incl cache) | tok out | cache | cost $ | turns |",
              "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
@@ -209,6 +223,21 @@ def render_results(agg: list[dict], raw: list[dict]) -> str:
                 return fmt.format((vb - va) / va * 100)
             lines.append(f"| {t} | {delta('wall_med')} | {delta('tok_in_med')} | "
                          f"{delta('tok_out_med')} | {delta('cost_med', '{:+.1f}%')} |")
+    if payloads and "a" in payloads and "b" in payloads:
+        pa, pb = payloads["a"], payloads["b"]
+        def pct(va, vb):
+            return f"{(vb - va) / va * 100:+.0f}%" if va else "n/a"
+        note = "" if pb["skills_bytes"] == pa["skills_bytes"] \
+            else " — the audit cut skills too, not only the standing file"
+        lines += ["", "## Standing instructions (A → B)", "",
+                  "| arm | standing file | skills | skill bytes | total payload |",
+                  "|---|---:|---:|---:|---:|",
+                  f"| A | {pa['standing_file_bytes']:,} B | {pa['skills']} | {pa['skills_bytes']:,} B | {pa['total_bytes']:,} B |",
+                  f"| B | {pb['standing_file_bytes']:,} B | {pb['skills']} | {pb['skills_bytes']:,} B | {pb['total_bytes']:,} B |",
+                  "",
+                  f"standing file {pct(pa['standing_file_bytes'], pb['standing_file_bytes'])}"
+                  f" · skill bytes {pct(pa['skills_bytes'], pb['skills_bytes'])}"
+                  f" · total payload {pct(pa['total_bytes'], pb['total_bytes'])}{note}"]
     lines += ["", f"_Generated {time.strftime('%Y-%m-%d %H:%M')} · {len(raw)} runs total · model {raw[0].get('model', '?') if raw else '?'} · tok in = fresh input + cache reads_"]
     return "\n".join(lines) + "\n"
 
@@ -229,6 +258,7 @@ def main() -> int:
         arms["b"] = a.arm_b
     profiles = {}
     config_dirs = {}
+    payloads = {}
     for k, corp in arms.items():
         corp_path = Path(corp)
         if (corp_path / "corpus").is_dir():          # config dir given -> mount its corpus/
@@ -237,9 +267,12 @@ def main() -> int:
         else:
             config_dirs[k] = corp_path.parent
         profiles[k] = f"bench-{k}"
+        payloads[k] = mounted_payload(corp_path)
         prof = setup_profile(profiles[k], corp_path, a.model)
         n = len(list((prof / "skills").glob("*/")))
         print(f"[arm {k}] profile {profiles[k]}: {n} skills, corpus mounted={(prof / 'AGENTS.md').exists()}, model {a.model}")
+        p = payloads[k]
+        print(f"[arm {k}] standing file {p['standing_file_bytes']:,} B · skills {p['skills']} × {p['skills_bytes']:,} B · payload {p['total_bytes']:,} B")
     if a.setup_only:
         return 0
     runs_dir = Path(a.resume) if a.resume else BENCH / "runs" / time.strftime("%Y%m%d-%H%M%S")
@@ -274,9 +307,9 @@ def main() -> int:
     agg = aggregate(rows)
     out_md = runs_dir / "results.md"
     out_md.parent.mkdir(parents=True, exist_ok=True)
-    out_md.write_text(render_results(agg, rows), encoding="utf-8")
+    out_md.write_text(render_results(agg, rows, payloads), encoding="utf-8")
     (runs_dir / "results.json").write_text(
-        json.dumps({"model": a.model, "repeats": a.repeats, "aggregate": agg, "raw": rows}, indent=1), encoding="utf-8")
+        json.dumps({"model": a.model, "repeats": a.repeats, "corpus": payloads, "aggregate": agg, "raw": rows}, indent=1), encoding="utf-8")
     sh([sys.executable, str(REPO / "render/report.py"), "--md", str(out_md),
         "--out", str(runs_dir / "results.html")])
     print(f"\nresults: {out_md} (+html)")

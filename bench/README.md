@@ -11,6 +11,7 @@ for config C (real, permissive-license, popular):
     for task T in the real-project tasks:
         N repeats × both arms, cold sessions, one model, one harness
         metrics: tokens_in (fresh input + cache reads) · tokens_out · wall_clock · turns · pass/fail
+        + corpus bytes per arm (standing file + mounted skills) — how hard the cleanup compressed the instructions
 aggregate medians → table (md + html view via render/report.py)
 ```
 
