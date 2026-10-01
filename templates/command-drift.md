@@ -1,1 +1,0 @@
-{{DRIFT_BODY}}
