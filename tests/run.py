@@ -3,9 +3,9 @@
 
 T1 (deterministic, free, hermetic — every harness gets its own fake $HOME under tests/out):
    installer per harness, meters vs fake stdio/HTTP MCP, drift, constitution, blame, translate.
-T2 (E2E, LLM): audit -> ground-truth check -> deterministic decisions -> apply -> post-asserts.
+T2 (E2E, LLM, every harness CLI found): see tests/t2.py — audit -> recall check -> decisions -> apply -> probes.
 
-Usage: python tests/run.py [--t1|--t2|--all]   (default: --all)
+Usage: python tests/run.py [--t1|--t2|--all] [--harness omp,pi,...] [--model glm-5.3-flash]   (default: --t1)
 """
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -367,6 +366,29 @@ def plugin_checks() -> None:
               f"missing={sorted(need - packed)}" if packed else n.stderr.strip()[-100:])
 
 
+def t2_parser_checks() -> None:
+    """T2's per-harness stream parsers against recorded event shapes (error lines are real captures)."""
+    sys.path.insert(0, str(REPO / "tests"))
+    import t2
+    parsers = {"pi_family": t2.parse_pi_family, "claude": t2.parse_claude,
+               "codex": t2.parse_codex, "opencode": t2.parse_opencode}
+    cases = json.loads((REPO / "tests/fixture/t2_events.json").read_text(encoding="utf-8"))
+    bad = []
+    for name, case in cases.items():
+        st = t2.Stats()
+        for ev in case["lines"]:
+            parsers[case["parser"]](ev, st)
+        for k, want in case["expect"].items():
+            got = getattr(st, k)
+            if (round(got, 6) if isinstance(got, float) else got) != want:
+                bad.append(f"{name}.{k}={got!r} (want {want!r})")
+    check("t2: stream parsers for omp/pi/claude/codex/opencode/cursor (usage, tools, auth errors)", not bad,
+          "; ".join(bad)[:160] if bad else f"{len(cases)} cases")
+    r = sh([sys.executable, "tests/t2.py"], env={k: v for k, v in os.environ.items() if k != "ZAI_API_KEY"})
+    check("t2: refuses to start without ZAI_API_KEY (exit 2, nothing run)",
+          r.returncode == 2 and "ZAI_API_KEY" in r.stdout and "Traceback" not in r.stderr, r.stdout.strip()[:80])
+
+
 def meters_discovery_check() -> None:
     """Auto-discovery across Claude/Codex/Cursor/Windsurf/OpenCode configs + usage from Claude/Codex logs."""
     sys.path.insert(0, str(REPO / "tests"))
@@ -420,6 +442,7 @@ def meters_discovery_check() -> None:
 def t1() -> None:
     print("== T1: deterministic ==")
     installer_checks()
+    t2_parser_checks()
     uninstall_checks()
     uninstall_edge_checks()
     plugin_install_checks()
@@ -585,117 +608,6 @@ def profile_setup() -> None:
         encoding="utf-8")
 
 
-DECISIONS = """# HiViz decisions (final — authored by the test operator)
-
-| target file (ABSOLUTE path — edit exactly this file, no other copy) | marker | action |
-|---|---|---|
-| {P}/AGENTS.md | `10.0.0.42 (legacy)` | rewrite: update the gateway line to 10.0.0.99 (migrated 2026-03); keep `npm run deploy` |
-| {P}/AGENTS.md | `Write clean, readable code and follow best practices.` | delete the line |
-| {P}/AGENTS.md | `Be careful and thorough when editing files.` | delete the line |
-| {P}/AGENTS.md | `Final stack state (2026-01-15)` | delete the line |
-| {P}/AGENTS.md | ``NEVER use the `git stash` command.`` | rewrite as: `Prefer explicit branches over `git stash`; use stash only to rescue uncommitted noise.` |
-| {P}/skills/smelly-skill/SKILL.md | `Always include a summary table in every response` | delete the line |
-| {P}/skills/smelly-skill/SKILL.md | the `Example output` block (hash d41d8cd…) | delete the whole fenced block |
-| {P}/RULES.md | every line | KEEP (safety) |
-| {P}/skills/clean-skill/SKILL.md | every line | KEEP |
-
-Backups: next to each edited file, as `<name>.bak-<YYYYMMDD>`.
-Probes (pre-authorized, headless `omp --profile hiviz-test -p "<ask>"`; save answers to {O}/probes-before.md and {O}/probes-after.md):
-- P1 ask: "Without extra text: quote your directives about secrets." expect marker: `redact`
-- P2 ask: "Without extra text: quote your directives about committing." expect marker: `explicit request`
-"""
-
-
-def t2() -> None:
-    print("== T2: E2E on sandbox profile ==")
-    OUT.mkdir(parents=True, exist_ok=True)
-    o = OUT.as_posix()
-    profile_setup()
-    if not os.environ.get("ZAI_API_KEY"):
-        # consistent online snapshot of the default profile's stored login (live db → use backup API)
-        import sqlite3
-        src_db = sqlite3.connect(str(HOME / ".omp/agent/agent.db"))
-        dst_db = sqlite3.connect(str(PROFILE / "agent.db"))
-        with dst_db:
-            src_db.backup(dst_db)
-        dst_db.close()
-        src_db.close()
-        check("t2: auth snapshot from default profile (agent.db)", (PROFILE / "agent.db").exists())
-    pf = sh(["omp", "--profile", "hiviz-test", "-p", "Reply with the single word OK."], timeout=180)
-    check("t2: profile pre-flight (omp boots)", "OK" in (pf.stdout or ""), (pf.stderr or "")[-120:])
-    surfaces = [PROFILE / "AGENTS.md", PROFILE / "RULES.md",
-                PROFILE / "skills/smelly-skill/SKILL.md", PROFILE / "skills/clean-skill/SKILL.md",
-                PROFILE / "skills/superpowers-systematic-debugging/SKILL.md",
-                PROFILE / "skills/anthropic-docx/SKILL.md"]
-    audit_prompt = (
-        "Use the hv-audit skill. Audit ONLY these instruction surfaces:\n"
-        + "\n".join(str(p) for p in surfaces)
-        + f"\nWrite {o}/report.md INCREMENTALLY — append each phase's table as soon as "
-          "it is computed, do not hold the report in chat. Also write the decisions template to "
-          f"{o}/decisions.md (DECISION column empty). Do NOT modify any audited file. "
-          "Your final chat reply: one summary line only. English.")
-    report = OUT / "report.md"
-    reuse = os.environ.get("HIVIZ_REUSE") == "1"
-    if reuse and report.exists() and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
-        print("  [skip] reusing existing report.md (HIVIZ_REUSE=1)")
-    else:
-        r = sh(["omp", "--profile", "hiviz-test", "-p", audit_prompt], timeout=1500)
-        (OUT / "audit-last-output.txt").write_text(
-            ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
-    check("audit: completed & report written", report.exists(),
-          "see tests/out/audit-last-output.txt" if not report.exists() else "")
-    if not report.exists():
-        return
-    body = report.read_text(encoding="utf-8")
-    missing = [m for m in GT["must_find"] if m not in body]
-    check(f"audit recall {len(GT['must_find']) - len(missing)}/{len(GT['must_find'])}",
-          not missing, "missing: " + ", ".join(missing) if missing else "all planted smells found")
-    import hashlib
-    _h = lambda p: hashlib.md5(Path(p).read_bytes()).hexdigest()
-    fx_files = {str(p): _h(p) for root in ["tests/fixture/agent", "tests/fixture/vendor"]
-                for p in (REPO / root).rglob("*") if p.is_file()}
-    (OUT / "decisions.md").write_text(
-        DECISIONS.format(P=PROFILE.as_posix(), O=o),
-        encoding="utf-8")
-    apply_prompt = (
-        f"Use the hv-apply procedure. The decisions file is {o}/decisions.md — "
-        "it is complete and final; apply exactly its rows, nothing else. "
-        "Back up every edited file (.bak-<date>). The two probes at the bottom are pre-authorized: "
-        f"run them before and after the edits and save answers to {o}/probes-before.md "
-        f"and {o}/probes-after.md (headless `omp --profile hiviz-test -p \"<ask>\"`). "
-        "ORDER: make ALL file edits FIRST, then run the probes (before-snapshot from backups is acceptable "
-        "if the session budget is tight). Do not commit. English.")
-    r = sh(["omp", "--profile", "hiviz-test", "-p", apply_prompt], timeout=2400)
-    (OUT / "apply-last-output.txt").write_text(
-        ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
-    changed_fx = [p for p, h in fx_files.items() if _h(p) != h]
-    check("fixture source untouched by apply", not changed_fx,
-          "edited: " + ", ".join(Path(p).name for p in changed_fx) if changed_fx else "")
-
-    for rel, markers in GT["post_apply_absent"].items():
-        f = PROFILE / rel
-        txt = f.read_text(encoding="utf-8") if f.exists() else ""
-        left = [m for m in markers if m in txt]
-        check(f"apply: {rel} cleaned", not left, "still present: " + ", ".join(left) if left else "")
-    for rel, markers in GT["post_apply_present"].items():
-        f = PROFILE / rel
-        txt = f.read_text(encoding="utf-8") if f.exists() else ""
-        gone = [m for m in markers if m not in txt]
-        check(f"apply: {rel} keeps invariants", not gone, "LOST: " + ", ".join(gone) if gone else "")
-    baks = list(PROFILE.glob("**/*.bak-*")) + list((PROFILE / "skills").glob("**/*.bak-*"))
-    check("apply: backups created", len(baks) >= 2, f"{len(baks)} .bak files")
-    pa = OUT / "probes-after.md"
-    check("apply: probes ran", pa.exists() and "redact" in pa.read_text(encoding="utf-8").lower(),
-          "probes-after.md with safety quote" if pa.exists() else "no probes-after.md")
-    vendor_installed = sorted(p.name for p in (PROFILE / "skills").glob("superpowers-*"))[:3]
-    check("t2: popular vendor skills present in sandbox", len(vendor_installed) >= 3,
-          f"{len(list((PROFILE / 'skills').glob('superpowers-*')))} superpowers + "
-          f"{len(list((PROFILE / 'skills').glob('anthropic-*')))} anthropic")
-    with open(REPO / "tests/results.log", "a", encoding="utf-8") as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M')} model=glm-5.3-flash:high "
-                f"passed={len(RESULTS) - len([r for r in RESULTS if not r[1]])}/{len(RESULTS)}\n")
-
-
 def summary() -> int:
     failed = [r for r in RESULTS if not r[1]]
     print(f"\n== {len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed ==")
@@ -706,14 +618,19 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     ap = argparse.ArgumentParser()
     ap.add_argument("--t1", action="store_true")
-    ap.add_argument("--t2", action="store_true")
+    ap.add_argument("--t2", action="store_true", help="end-to-end on real harness CLIs (needs ZAI_API_KEY)")
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--harness", default=None, help="T2: comma list of harnesses (default: all found)")
+    ap.add_argument("--model", default=None, help="T2: z.ai model id")
     a = ap.parse_args()
+    rc = 0
     if a.t1 or a.all or not (a.t1 or a.t2):
         t1()
+        rc = summary()
     if a.t2 or a.all:
-        t2()
-    return summary()
+        import t2
+        rc = max(rc, t2.main(a.harness, a.model))
+    return rc
 
 
 if __name__ == "__main__":

@@ -1,0 +1,451 @@
+{
+ "omp-ok": {
+  "parser": "pi_family",
+  "lines": [
+   {
+    "type": "message_end",
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "text",
+       "text": "go"
+      }
+     ]
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "toolCall",
+       "name": "read"
+      }
+     ]
+    }
+   },
+   {
+    "type": "message_end",
+    "message": {
+     "role": "assistant",
+     "stopReason": "toolUse",
+     "content": [
+      {
+       "type": "toolCall",
+       "id": "t1",
+       "name": "read",
+       "arguments": {
+        "path": "AGENTS.md"
+       }
+      }
+     ],
+     "usage": {
+      "input": 100,
+      "output": 20,
+      "cacheRead": 50,
+      "cacheWrite": 0,
+      "cost": {
+       "total": 0.01
+      }
+     }
+    }
+   },
+   {
+    "type": "message_end",
+    "message": {
+     "role": "assistant",
+     "stopReason": "stop",
+     "content": [
+      {
+       "type": "text",
+       "text": "OK"
+      }
+     ],
+     "usage": {
+      "input": 200,
+      "output": 10,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "cost": {
+       "total": 0.02
+      }
+     }
+    }
+   }
+  ],
+  "expect": {
+   "tool_calls": 1,
+   "last_tool": "read",
+   "tokens_in": 350,
+   "tokens_out": 30,
+   "cost": 0.03,
+   "text": "OK",
+   "error": "",
+   "fatal": ""
+  }
+ },
+ "omp-401": {
+  "parser": "pi_family",
+  "lines": [
+   {
+    "type": "message_end",
+    "message": {
+     "role": "assistant",
+     "content": [],
+     "api": "openai-completions",
+     "provider": "zai",
+     "model": "glm-5.3-flash",
+     "usage": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 0,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "error",
+     "errorStatus": 401,
+     "errorId": 16781312,
+     "errorMessage": "401 token expired or incorrect\ntoken expired or incorrect (type=401)",
+     "duration": 366.612077,
+     "completedAt": 1790824758521
+    }
+   }
+  ],
+  "expect": {
+   "error": "401 token expired or incorrect",
+   "fatal": "401 token expired or incorrect"
+  }
+ },
+ "pi-401": {
+  "parser": "pi_family",
+  "lines": [
+   {
+    "type": "message_end",
+    "message": {
+     "role": "assistant",
+     "content": [],
+     "api": "openai-completions",
+     "provider": "zai",
+     "model": "glm-5.3-flash",
+     "usage": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 0,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "error",
+     "errorMessage": "401: {\"code\":\"401\",\"message\":\"token expired or incorrect\"}",
+     "thinkingLevel": "high"
+    }
+   }
+  ],
+  "expect": {
+   "error": "401 token expired or incorrect",
+   "fatal": "401 token expired or incorrect"
+  }
+ },
+ "claude-ok": {
+  "parser": "claude",
+  "lines": [
+   {
+    "type": "system",
+    "subtype": "init",
+    "tools": [
+     "Bash"
+    ]
+   },
+   {
+    "type": "assistant",
+    "message": {
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "u1",
+       "name": "Bash",
+       "input": {
+        "command": "ls"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "type": "user",
+    "message": {
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "u1",
+       "content": "AGENTS.md"
+      }
+     ]
+    }
+   },
+   {
+    "type": "assistant",
+    "message": {
+     "content": [
+      {
+       "type": "text",
+       "text": "OK"
+      }
+     ]
+    }
+   },
+   {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "num_turns": 2,
+    "result": "OK",
+    "total_cost_usd": 0.5,
+    "usage": {
+     "input_tokens": 10,
+     "cache_read_input_tokens": 90,
+     "cache_creation_input_tokens": 0,
+     "output_tokens": 5
+    }
+   }
+  ],
+  "expect": {
+   "tool_calls": 1,
+   "last_tool": "Bash",
+   "tokens_in": 100,
+   "tokens_out": 5,
+   "cost": null,
+   "text": "OK",
+   "error": ""
+  }
+ },
+ "claude-401": {
+  "parser": "claude",
+  "lines": [
+   {
+    "type": "system",
+    "subtype": "api_retry",
+    "attempt": 1,
+    "max_retries": 10,
+    "error_status": 401,
+    "error": "authentication_failed"
+   }
+  ],
+  "expect": {
+   "fatal": "401 authentication_failed"
+  }
+ },
+ "codex-ok": {
+  "parser": "codex",
+  "lines": [
+   {
+    "type": "thread.started",
+    "thread_id": "x"
+   },
+   {
+    "type": "turn.started"
+   },
+   {
+    "type": "item.started",
+    "item": {
+     "id": "i0",
+     "type": "command_execution",
+     "command": "ls"
+    }
+   },
+   {
+    "type": "item.completed",
+    "item": {
+     "id": "i0",
+     "type": "command_execution",
+     "command": "ls",
+     "exit_code": 0
+    }
+   },
+   {
+    "type": "item.completed",
+    "item": {
+     "id": "i1",
+     "type": "agent_message",
+     "text": "OK"
+    }
+   },
+   {
+    "type": "turn.completed",
+    "usage": {
+     "input_tokens": 120,
+     "cached_input_tokens": 100,
+     "output_tokens": 7
+    }
+   }
+  ],
+  "expect": {
+   "tool_calls": 1,
+   "last_tool": "shell",
+   "tokens_in": 120,
+   "tokens_out": 7,
+   "text": "OK",
+   "error": ""
+  }
+ },
+ "codex-401": {
+  "parser": "codex",
+  "lines": [
+   {
+    "type": "error",
+    "message": "Reconnecting... 1/5 (stream disconnected before completion: stream closed before response.completed)"
+   },
+   {
+    "type": "turn.failed",
+    "error": {
+     "message": "unexpected status 401 Unauthorized"
+    }
+   }
+  ],
+  "expect": {
+   "fatal": "unexpected status 401 Unauthorized"
+  }
+ },
+ "opencode-ok": {
+  "parser": "opencode",
+  "lines": [
+   {
+    "type": "step_start",
+    "part": {
+     "type": "step-start"
+    }
+   },
+   {
+    "type": "tool_use",
+    "part": {
+     "type": "tool",
+     "tool": "bash",
+     "state": {
+      "status": "completed"
+     }
+    }
+   },
+   {
+    "type": "text",
+    "part": {
+     "type": "text",
+     "text": "OK"
+    }
+   },
+   {
+    "type": "step_finish",
+    "part": {
+     "type": "step-finish",
+     "reason": "stop",
+     "cost": 0.004,
+     "tokens": {
+      "input": 30,
+      "output": 4,
+      "reasoning": 0,
+      "cache": {
+       "read": 70,
+       "write": 0
+      }
+     }
+    }
+   }
+  ],
+  "expect": {
+   "tool_calls": 1,
+   "last_tool": "bash",
+   "tokens_in": 100,
+   "tokens_out": 4,
+   "cost": 0.004,
+   "text": "OK",
+   "error": ""
+  }
+ },
+ "opencode-401": {
+  "parser": "opencode",
+  "lines": [
+   {
+    "type": "error",
+    "timestamp": 1790824762685,
+    "sessionID": "ses_f0a86b8a3ffe3Ql2vAyv0y2eny",
+    "error": {
+     "name": "APIError",
+     "data": {
+      "message": "token expired or incorrect",
+      "statusCode": 401,
+      "isRetryable": false,
+      "metadata": {
+       "url": "https://api.z.ai/api/coding/paas/v4/chat/completions"
+      }
+     }
+    }
+   }
+  ],
+  "expect": {
+   "fatal": "401 token expired or incorrect"
+  }
+ },
+ "cursor-ok": {
+  "parser": "claude",
+  "lines": [
+   {
+    "type": "tool_call",
+    "subtype": "started",
+    "tool_call": {
+     "readToolCall": {
+      "args": {
+       "path": "AGENTS.md"
+      }
+     }
+    }
+   },
+   {
+    "type": "tool_call",
+    "subtype": "completed",
+    "tool_call": {
+     "readToolCall": {
+      "result": {}
+     }
+    }
+   },
+   {
+    "type": "assistant",
+    "message": {
+     "content": [
+      {
+       "type": "text",
+       "text": "OK"
+      }
+     ]
+    }
+   },
+   {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "result": "OK",
+    "duration_ms": 900
+   }
+  ],
+  "expect": {
+   "tool_calls": 1,
+   "last_tool": "read",
+   "text": "OK",
+   "error": ""
+  }
+ }
+}
