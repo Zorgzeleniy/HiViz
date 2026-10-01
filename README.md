@@ -239,10 +239,6 @@ quality: the corpus arm never scored higher in any cell; cleaning caused 0 quali
   tx-kv: in both configs the corpus arm dropped a point on the same exact-bytes WAL check; clean 10/10.
 corpus shrink (A → B): popular AGENTS.md 15,245 → 3,638 B (−76%) · julep 19,013 → 4,308 B (−77%)
   popular's 17 skills (456.8 kB) ride both arms untouched — the audit cut the standing file, not the skill set
-skills audit (Oct 1, third arm, n=3×3): −4.5% more corpus (460.5→440.0 kB), 0 quality regressions —
-  and no cost signal: no task ever read a skill body, so those bytes were never in the context path
-caveat the Oct 1 rerun taught: same-day cells don't reproduce across days at n=3 —
-  two fresh arm-A samples the same day differ ±30-80% on cost medians; read each table as its own day
 ```
 
 **A floor, not a ceiling.** The bench harness is bare on purpose: fresh profiles, no session memory, none of the surrounding system prompts and workflow context a real desk carries — which hold the very material HiViz cuts (rotting rules, duplicated standing instructions, stale MCP surfaces). Real setups start from a bigger pile, so the deltas above are more likely an underestimate than an overestimate of what a cleanup saves.

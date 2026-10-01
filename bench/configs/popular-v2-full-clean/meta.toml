@@ -1,5 +1,0 @@
-name = "popular-v2-full-clean"
-origin = "popular-v2-clean after a SECOND hiviz audit+apply over the 17-skill corpus (2026-10-01): orphaned reviewer prompts + creation log + test-pressure fixtures deleted, 4 fabricated 'Example Workflow' transcripts cut, dead skill refs (frontend-design/mcp-builder/elements-of-style/caveman-compress) removed, TDD↔writing-skills 7-line duplicate merged, 90%-rule overreaches conditionalized (ANY-gratitude, ANY-positive-claim, skip-review, 95%-stat), caveman 4×-stated keep-verbatim rules deduped, poetry→uv"
-url = "https://github.com/Zorgzeleniy/hiviz"
-source = "audit artifacts in .hiviz/ (report-20261001-0030.md, decisions.md, ledger.jsonl 28 entries, probes-after.md)"
-description = "Third arm: how much a skills-level audit sheds on top of the standing-file cleanup — 460,461 → 439,935 B (−4.5%), CLAUDE.md identical to popular-v2-clean"
