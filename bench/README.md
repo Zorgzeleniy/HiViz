@@ -35,6 +35,7 @@ in configs/ for the frozen historical runs.
 
 ## Honest limitations (kept on purpose)
 
+- Cells are same-day evidence only. The Oct 1 third-arm experiment (popular-v2-full-clean: the skills corpus audited per hiviz rules, −4.5% bytes) reran all three tasks same-day and found: (a) two independent arm-A samples drawn the same day differ ±30-80% on cost medians, and single runs tail out 2-2.5× inside one arm — n=3 medians cannot resolve anything smaller; (b) no Sept cell reproduced in sign on Oct 1 (the endpoint itself drifted: runs went from ~15 min/$0.6 to ~2 min/$0.08); (c) no task session ever read a skill body — skills-audit bytes were never in the context path, that day's arm deltas were sampling noise, not corpus effect. Compare arms only within one run day; quality (deterministic) is the only portable signal.
 - This is a field version: 4 tasks × 2 configs × n=3 on one model and one harness is a pilot scale, not science; report medians and say so. Cells where a run came back without provider cost data are reported as n/a, not estimated.
 - Corpus facts in `qa` could in principle be answered from training data if the repo is famous; markers are chosen to require the local file.
 - Token accounting: `tokens_in` is the total input the model saw — fresh input + cache reads merged; `tokens_out` reported separately. Usage comes from `--mode=json`; model and repeat count are recorded in `results.json`.

@@ -1,0 +1,152 @@
+{
+ "model": "zai/glm-5.3:max",
+ "repeats": 3,
+ "corpus": {
+  "a": {
+   "standing_file_bytes": 15245,
+   "skills": 17,
+   "skills_bytes": 456823,
+   "total_bytes": 472068
+  },
+  "b": {
+   "standing_file_bytes": 3638,
+   "skills": 17,
+   "skills_bytes": 456823,
+   "total_bytes": 460461
+  }
+ },
+ "aggregate": [
+  {
+   "arm": "a",
+   "task": "harden-client",
+   "pass_rate": 1.0,
+   "score_med": 10.0,
+   "score_min": 10.0,
+   "score_max": 10.0,
+   "wall_med": 131,
+   "wall_min": 129,
+   "wall_max": 134,
+   "tok_in_med": 186327,
+   "tok_out_med": 7751,
+   "cache_med": 172224,
+   "cost_med": 0.10019324,
+   "turns_med": 11,
+   "n": 3
+  },
+  {
+   "arm": "b",
+   "task": "harden-client",
+   "pass_rate": 1.0,
+   "score_med": 10.0,
+   "score_min": 10.0,
+   "score_max": 10.0,
+   "wall_med": 130,
+   "wall_min": 110,
+   "wall_max": 158,
+   "tok_in_med": 53749,
+   "tok_out_med": 8613,
+   "cache_med": 43072,
+   "cost_med": 0.06607152,
+   "turns_med": 4,
+   "n": 3
+  }
+ ],
+ "raw": [
+  {
+   "task": "harden-client",
+   "rep": 1,
+   "pass": true,
+   "detail": "SCORE: 10/10 \u2014 all green",
+   "score": 10.0,
+   "wall_s": 134,
+   "input_tokens": 186327,
+   "output_tokens": 8107,
+   "cache_read": 172224,
+   "cost_total": 0.10019324,
+   "turns": 11,
+   "tokens_approx": false,
+   "arm": "a",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "harden-client",
+   "rep": 2,
+   "pass": true,
+   "detail": "SCORE: 10/10 \u2014 all green",
+   "score": 10.0,
+   "wall_s": 129,
+   "input_tokens": 259976,
+   "output_tokens": 7751,
+   "cache_read": 241920,
+   "cost_total": 0.12228200000000002,
+   "turns": 14,
+   "tokens_approx": false,
+   "arm": "a",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "harden-client",
+   "rep": 3,
+   "pass": true,
+   "detail": "SCORE: 10/10 \u2014 all green",
+   "score": 10.0,
+   "wall_s": 131,
+   "input_tokens": 98178,
+   "output_tokens": 7081,
+   "cache_read": 78720,
+   "cost_total": 0.07886480000000001,
+   "turns": 6,
+   "tokens_approx": false,
+   "arm": "a",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "harden-client",
+   "rep": 1,
+   "pass": true,
+   "detail": "SCORE: 10/10 \u2014 all green",
+   "score": 10.0,
+   "wall_s": 158,
+   "input_tokens": 53749,
+   "output_tokens": 9049,
+   "cache_read": 43072,
+   "cost_total": 0.06596212,
+   "turns": 4,
+   "tokens_approx": false,
+   "arm": "b",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "harden-client",
+   "rep": 2,
+   "pass": true,
+   "detail": "SCORE: 10/10 \u2014 all green",
+   "score": 10.0,
+   "wall_s": 110,
+   "input_tokens": 85078,
+   "output_tokens": 6899,
+   "cache_read": 73152,
+   "cost_total": 0.06607152,
+   "turns": 6,
+   "tokens_approx": false,
+   "arm": "b",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "harden-client",
+   "rep": 3,
+   "pass": true,
+   "detail": "SCORE: 10/10 \u2014 all green",
+   "score": 10.0,
+   "wall_s": 130,
+   "input_tokens": 52897,
+   "output_tokens": 8613,
+   "cache_read": 34944,
+   "cost_total": 0.07211684000000002,
+   "turns": 4,
+   "tokens_approx": false,
+   "arm": "b",
+   "model": "zai/glm-5.3:max"
+  }
+ ]
+}

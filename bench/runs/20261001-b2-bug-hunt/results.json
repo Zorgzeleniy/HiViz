@@ -1,0 +1,152 @@
+{
+ "model": "zai/glm-5.3:max",
+ "repeats": 3,
+ "corpus": {
+  "a": {
+   "standing_file_bytes": 15245,
+   "skills": 17,
+   "skills_bytes": 456823,
+   "total_bytes": 472068
+  },
+  "b": {
+   "standing_file_bytes": 3638,
+   "skills": 17,
+   "skills_bytes": 456823,
+   "total_bytes": 460461
+  }
+ },
+ "aggregate": [
+  {
+   "arm": "a",
+   "task": "bug-hunt",
+   "pass_rate": 0.0,
+   "score_med": 6.0,
+   "score_min": 6.0,
+   "score_max": 6.0,
+   "wall_med": 495,
+   "wall_min": 373,
+   "wall_max": 507,
+   "tok_in_med": 1020974,
+   "tok_out_med": 22642,
+   "cache_med": 968704,
+   "cost_med": 0.45118024,
+   "turns_med": 25,
+   "n": 3
+  },
+  {
+   "arm": "b",
+   "task": "bug-hunt",
+   "pass_rate": 0.0,
+   "score_med": 6.0,
+   "score_min": 4.0,
+   "score_max": 6.0,
+   "wall_med": 683,
+   "wall_min": 448,
+   "wall_max": 1056,
+   "tok_in_med": 1104193,
+   "tok_out_med": 30118,
+   "cache_med": 1037504,
+   "cost_med": 0.4956348400000001,
+   "turns_med": 25,
+   "n": 3
+  }
+ ],
+ "raw": [
+  {
+   "task": "bug-hunt",
+   "rep": 1,
+   "pass": false,
+   "detail": "SCORE: 6/10 \u2014 fails: exp=[1] -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; nbf={a:1} -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; iat=None -> InvalidIssuedAtError: TypeError: int() argument must be a string, a bytes-like object or a re; exp=inf -> DecodeError: OverflowError: cannot convert float infinity to integer",
+   "score": 6.0,
+   "wall_s": 507,
+   "input_tokens": 1020974,
+   "output_tokens": 28668,
+   "cache_read": 968704,
+   "cost_total": 0.45118024,
+   "turns": 25,
+   "tokens_approx": false,
+   "arm": "a",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "bug-hunt",
+   "rep": 2,
+   "pass": false,
+   "detail": "SCORE: 6/10 \u2014 fails: exp=[1] -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; nbf={a:1} -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; iat=None -> InvalidIssuedAtError: TypeError: int() argument must be a string, a bytes-like object or a re; exp=inf -> DecodeError: OverflowError: cannot convert float infinity to integer",
+   "score": 6.0,
+   "wall_s": 495,
+   "input_tokens": 1196231,
+   "output_tokens": 22642,
+   "cache_read": 1141568,
+   "cost_total": 0.47296068,
+   "turns": 31,
+   "tokens_approx": false,
+   "arm": "a",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "bug-hunt",
+   "rep": 3,
+   "pass": false,
+   "detail": "SCORE: 6/10 \u2014 fails: exp=[1] -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; nbf={a:1} -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; iat=None -> InvalidIssuedAtError: TypeError: int() argument must be a string, a bytes-like object or a re; exp=inf -> DecodeError: OverflowError: cannot convert float infinity to integer",
+   "score": 6.0,
+   "wall_s": 373,
+   "input_tokens": 489802,
+   "output_tokens": 20811,
+   "cache_read": 450432,
+   "cost_total": 0.26379872,
+   "turns": 17,
+   "tokens_approx": false,
+   "arm": "a",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "bug-hunt",
+   "rep": 1,
+   "pass": false,
+   "detail": "SCORE: 4/10 \u2014 fails: exp=inf -> DecodeError: OverflowError: cannot convert float infinity to integer; encode iss=123 -> TypeError: AssertionError: expected TypeError; iss=123 vs issuer=[123] -> InvalidIssuerError: AssertionError: non-str iss must not validate against numeric container; validate iss=777 -> type error message: AssertionError:",
+   "score": 4.0,
+   "wall_s": 1056,
+   "input_tokens": 1496394,
+   "output_tokens": 53487,
+   "cache_read": 1411136,
+   "cost_total": 0.7215993599999999,
+   "turns": 30,
+   "tokens_approx": false,
+   "arm": "b",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "bug-hunt",
+   "rep": 2,
+   "pass": false,
+   "detail": "SCORE: 6/10 \u2014 fails: exp=[1] -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; nbf={a:1} -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; iat=None -> InvalidIssuedAtError: TypeError: int() argument must be a string, a bytes-like object or a re; exp=inf -> DecodeError: OverflowError: cannot convert float infinity to integer",
+   "score": 6.0,
+   "wall_s": 448,
+   "input_tokens": 639728,
+   "output_tokens": 20550,
+   "cache_read": 592768,
+   "cost_total": 0.31028368,
+   "turns": 19,
+   "tokens_approx": false,
+   "arm": "b",
+   "model": "zai/glm-5.3:max"
+  },
+  {
+   "task": "bug-hunt",
+   "rep": 3,
+   "pass": false,
+   "detail": "SCORE: 6/10 \u2014 fails: exp=[1] -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; nbf={a:1} -> DecodeError: TypeError: int() argument must be a string, a bytes-like object or a re; iat=None -> InvalidIssuedAtError: TypeError: int() argument must be a string, a bytes-like object or a re; exp=inf -> DecodeError: OverflowError: cannot convert float infinity to integer",
+   "score": 6.0,
+   "wall_s": 683,
+   "input_tokens": 1104193,
+   "output_tokens": 30118,
+   "cache_read": 1037504,
+   "cost_total": 0.4956348400000001,
+   "turns": 25,
+   "tokens_approx": false,
+   "arm": "b",
+   "model": "zai/glm-5.3:max"
+  }
+ ]
+}
