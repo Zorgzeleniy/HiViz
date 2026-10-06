@@ -487,6 +487,93 @@ def format_checks() -> None:
               (a.stderr.strip().splitlines() or [""])[-1])
 
 
+def report_checks() -> None:
+    import report as rp
+    fx = REPO / "tests/fixture/report.md"
+    out = OUT / "report_fx.html"
+    r = sh([sys.executable, "render/report.py", "--md", str(fx), "--out", str(out)])
+    page = out.read_text(encoding="utf-8") if out.exists() else ""
+    md = fx.read_text(encoding="utf-8")
+    rep = rp.parse(md)
+    rows = rp.all_rows(rep) if rep else []
+    byid = {x.id: x for x in rows}
+    c1, d16, d05 = byid.get("C1"), byid.get("D16"), byid.get("D05")
+    parsed = bool(rep and len(rows) == 14 and rep.has_where and rep.has_b and rep.corpus == 19377
+                  and c1 and c1.conflict and c1.other.endswith("SKILL.md:9") and c1.other_q.startswith("10.0.0.99")
+                  and d16 and rp.unwrap(d16.line).startswith("| Excuse | Reality |") and d16.b == 864
+                  and d05 and d05.cat == "90%-rule" and d05.ev == "" and byid["D13"].ev == "fact")
+    check("report: contract parsed (where, B, category, conflict sides, escaped pipes)", parsed,
+          f"{len(rows)} rows" if rows else "no rows")
+    no_net = not re.search(r"""(?:src|href)=["']https?:""", page)
+    check("report: HTML view — sticky header, 11 decision rows, safe lines folded, offline",
+          r.returncode == 0 and "position:sticky" in page and len(re.findall(r'<div class="row [^"]*"[^>]* data-need>', page)) == 11
+          and "<details class=\"safe\">" in page and no_net and "Export decisions.md" in page,
+          f"{len(page):,} bytes")
+    hostile = rp.render(md.replace("baseline behaviour", "</script><script>alert(1)</script><!-- x"), "t")
+    hm = re.search(r"<script type='application/json' id='hv-data'>(.*?)</script>", hostile, re.S)
+    try:
+        blob = json.loads(hm.group(1)) if hm else {}
+    except ValueError:
+        blob = {}
+    check("report: model-written text cannot break out of the page (escaped cells, safe JSON blob)",
+          bool(blob) and "<script>alert(1)" not in hostile.replace(hm.group(0), "") and any("alert(1)" in r["why"] for r in blob.get("rows", [])),
+          "")
+    legacy = "\n".join(["# t", "", "🔴 1 act now · 🟡 1 your call · ⚪ 0 fine · corpus 1.0 KB → shed −1.0%", "",
+                        "## 🔴 Act now", "", "| id | line | why | → |", "|---|---|---|---|",
+                        "| C1 | `x` | conflict: smelly:9 says `y` — two values | verify |", "",
+                        "## 🟡 Your call", "", "| id | line | why | → verb |", "|---|---|---|---|",
+                        "| D1 | `a \\| b` | trained-dup: default | → delete |"])
+    model_style = "\n".join(["🔴 1 act now · 🟡 0 your call · ⚪ 0 fine · corpus 1.0 KB → shed −1%", "",
+                             "## 🔴 Act now", "",
+                             "| id | where | line ≤60 chars | why ≤80 chars | B | → verb |",
+                             "| R1 | /w/A.md:3 ⇄ /w/B.md:9 | the gateway is .42 | conflict: B says «the gateway is .99» — two IPs | 0 | verify |"])
+    mrep = rp.parse(model_style)
+    mr = rp.all_rows(mrep)[0] if mrep and rp.all_rows(mrep) else None
+    check("report: grammar-template headers and a missing separator row are tolerated",
+          bool(mr and mr.line == "the gateway is .42" and mr.b == 0 and mr.verb == "verify" and mr.other == "/w/B.md:9"
+               and mr.other_q == "the gateway is .99" and mr.cat == "conflict"), "")
+    lrep = rp.parse(legacy)
+    lh = rp.render(legacy, "legacy")
+    check("report: older 4-column reports still render (no where / B)",
+          bool(lrep and not lrep.has_where and not lrep.has_b and len(rp.all_rows(lrep)) == 2
+               and rp.all_rows(lrep)[0].other_q == "y" and rp.all_rows(lrep)[1].verb == "delete"
+               and "data-need" in lh),
+          "2 rows")
+    env = {k: v for k, v in os.environ.items() if k not in ("NO_COLOR", "FORCE_COLOR", "HIVIZ_FORMAT")}
+    sm = sh([sys.executable, "render/report.py", "--md", str(fx), "--summary", "--format", "pretty"], env=env)
+    sa = sh([sys.executable, "render/report.py", "--md", str(fx), "--summary", "--format", "pretty"],
+            env={**env, "PYTHONIOENCODING": "ascii"})
+    check("report: terminal summary — counts, rows by effect, conflict sides, ASCII-safe",
+          sm.returncode == 0 and "2 act now" in sm.stdout and "kept safe" in sm.stdout and "D16" in sm.stdout
+          and "SKILL.md:9" in sm.stdout and sa.returncode == 0 and sa.stdout.isascii() and "Traceback" not in sa.stderr,
+          (sa.stderr.strip().splitlines() or [""])[-1])
+    browser = next((b for b in ("google-chrome", "chromium", "chromium-browser") if shutil.which(b)), None)
+    if not browser:
+        check("report: export round-trip in a browser (skipped — no Chrome/Chromium)", True)
+        return
+    drive = ("<script>var q=function(k,v){document.querySelector('.row[data-id='+k+'] button[data-v='+v+']').click()};"
+             "q('C2','no');q('D05','cond');var n=document.querySelector('.row[data-id=D05] input.note');"
+             "n.value='only the relevant tests';n.dispatchEvent(new Event('input',{bubbles:true}));n.blur();"
+             "q('D19','keep');document.querySelector('.chip[data-cat=trained-dup] button').click();</script>")
+    # fresh localStorage key per run: the page persists decisions, a custom --user-data-dir hangs headless Chrome here
+    fresh = re.sub(r'"key": "[0-9a-f]+"', f'"key": "t{time.time_ns()}"', page, count=1)
+    drv = OUT / "report_drive.html"
+    drv.write_text(fresh.replace("</body>", drive + "</body>"), encoding="utf-8")
+    dom = sh([browser, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=4000",
+              "--dump-dom", drv.as_uri()], timeout=60)
+    import html as _h
+    m = re.search(r"<pre id=\"prev\">(.*?)</pre>", dom.stdout or "", re.S)
+    exp = _h.unescape(m.group(1)) if m else ""
+    row = lambda k: next((l for l in exp.splitlines() if l.startswith(f"| {k} |")), "")
+    ok = (bool(exp) and row("C2").endswith("| delete | no |") and row("D19").endswith("| delete | keep |")
+          and row("D05").endswith("| rewrite | as-condition: only the relevant tests |")
+          and row("D01").endswith("| delete | yes |") and row("D06").endswith("| rewrite |  |")
+          and row("C1").endswith("| verify |  |") and row("K12").endswith("| keep | keep |")
+          and "\\| Excuse \\| Reality" in row("D16") and "⇄" in row("C1") and "## ⚪ Kept safe" in exp)
+    check("report: browser export — decisions, batch skips decided rows, undecided stays empty, pipes escaped", ok,
+          f"{len(exp.splitlines())} lines" if exp else (dom.stderr or "no preview")[-100:])
+
+
 def t1() -> None:
     print(hvfmt.heading("T1 · deterministic", "hermetic fake $HOME per harness · no model calls") if hvfmt.is_pretty()
           else "== T1: deterministic ==")
@@ -641,6 +728,7 @@ def t1() -> None:
           tr_ok, f"7 targets, claude CLAUDE({len(cl['CLAUDE.md'].splitlines())}L)" if tr_ok
           else (tr_err or "content mismatch")[-160:])
     format_checks()
+    report_checks()
     plugin_checks()
 
 # ---------------------------------------------------------------- T2
@@ -711,6 +799,24 @@ def _bak_hint() -> str:
     return f"{n} backup(s) written" if n else "no edits yet"
 
 
+def report_view(report: Path, body: str) -> None:
+    """Contract check on the model's report + what a human sees after the audit."""
+    import report as rp
+    rep = rp.parse(body)
+    rows = rp.all_rows(rep) if rep else []
+    good = [r for r in rows if re.search(r":\d+(-\d+)?$", r.where.split("⇄")[0].strip())
+            and r.line.strip() and r.b is not None and r.verb in rp.VERBS]
+    check("audit: every row carries where=path:line, a quoted line, B and a known verb",
+          bool(rows) and len(good) >= 0.9 * len(rows),
+          f"{len(good)}/{len(rows)} rows")
+    html_path = OUT / "report.html"
+    html_path.write_text(rp.render(body, report.stem), encoding="utf-8")
+    if hvfmt.is_pretty():
+        print(rp.terminal(body, report.as_posix(), html_path.as_posix(), (OUT / "decisions.md").as_posix()))
+    else:
+        print(f"  report: {report.as_posix()}\n  html view: {html_path.as_posix()}")
+
+
 def t2() -> None:
     print(hvfmt.heading("T2 · end-to-end", f"{T2_HARNESS}"
                         + (f" · {T2_MODEL}" if T2_HARNESS == "opencode" else "")
@@ -765,6 +871,7 @@ def t2() -> None:
     if not report.exists():
         return
     body = report.read_text(encoding="utf-8")
+    report_view(report, body)
     missing = [m for m in GT["must_find"] if m not in body]
     check(f"audit recall {len(GT['must_find']) - len(missing)}/{len(GT['must_find'])}",
           not missing, "missing: " + ", ".join(missing) if missing else "all planted smells found")

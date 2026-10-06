@@ -8,7 +8,7 @@ description: "Apply human-approved hiviz decisions (.hiviz/decisions.md) to stan
 1. **Before-probes** (ask the user first; if the task brief explicitly pre-authorizes the probes, run them without asking). Each probe is one model call. For 1–3 rules marked `probe-worthy` in decisions, run a headless session of the CURRENT harness (`claude -p "…"` / `codex exec "…"` / `omp -p "…"` / `pi -p "…"` / `cursor-agent -p "…"` / `opencode run "…"`): "Without extra text: quote your directives about X." Save answers to `.hiviz/probes-before.md`.
 
 2. **Backups**: every file about to be edited → `<file>.bak-<YYYYMMDD>` next to it.
-3. **Apply exactly the approved edits.** Nothing of your own: no new lines, no reformatting of untouched lines, no improvements. Merges and relocations — precisely as decided.
+3. **Apply exactly the approved edits.** Nothing of your own: no new lines, no reformatting of untouched lines, no improvements. Merges and relocations — precisely as decided. A row's `DECISION` rules: `yes` = do its verb, `as-condition: <text>` = do it only as the condition says, `no` / `keep` / empty = leave the line untouched. The `where` column names the file; edit exactly that path.
 4. **After-probes**: the same questions, fresh sessions. Compare: rule alive (its source may have moved — that is fine if the rule survives in the remaining location) / rule lost → restore that line from the backup.
 5. **Ledger**: append ONE line per approved decision to `.hiviz/ledger.jsonl`:
    `{"file": "<abs path>", "marker": "<line fragment>", "written_at": "<iso>", "model": "<current model>", "reason": "<audit id or user note>", "action": "deleted|rewritten|kept|merged"}`. This is what makes future `blame` instant and conflict arbitration mechanical.

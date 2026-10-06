@@ -33,6 +33,10 @@ STATUS = {
     "FLAKY": ("◐", "~", "yellow"),
     "UNVERIFIABLE": ("○", "?", "yellow"), "ORPHANED": ("○", "?", "yellow"),
     "SKIP": ("–", "-", "gray"),
+    # audit-report verbs (→ verb column)
+    "delete": ("✘", "x", "red"), "disable": ("⊘", "x", "red"),
+    "rewrite": ("✎", "~", "yellow"), "merge": ("⇄", "=", "cyan"),
+    "verify": ("?", "?", "yellow"), "keep": ("✔", "+", "green"),
 }
 _BOX_U = dict(tl="╭", tr="╮", bl="╰", br="╯", h="─", v="│", t="┬", b="┴", l="├", r="┤", x="┼")
 _BOX_A = dict(tl="+", tr="+", bl="+", br="+", h="-", v="|", t="+", b="+", l="+", r="+", x="+")
@@ -53,8 +57,8 @@ def _isatty(stream) -> bool:
 
 # Glyphs the engines print besides STATUS/box/bar symbols; folded to ASCII when the stream can't carry them.
 _FOLD = str.maketrans({"·": "-", "→": "->", "…": "...", "“": '"', "”": '"', "—": "-", "–": "-", "━": "=",
-                       "•": "*"})
-_GLYPHS = "╭✔✘◐○⠋█░━·→“”…—"
+                       "•": "*", "●": "*", "⇄": "<>", "−": "-"})
+_GLYPHS = "╭✔✘◐○⠋█░━·→“”…—✎⊘⇄●"
 
 
 class _Folded:

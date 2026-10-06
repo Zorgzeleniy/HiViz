@@ -50,9 +50,11 @@ Write `.hiviz/report-<YYYYMMDD-HHMM>.md` (versioned — NEVER overwrite a previo
 - The executive line is a literal template — only the numbers change:
   `🔴 {N} act now · 🟡 {M} your call · ⚪ {K} fine · corpus {X} KB → shed −{Y}%`
 - Section headers are literals: `## 🔴 Act now` · `## 🟡 Your call` · `## ⚪ Kept safe` · `## Appendix`
-- Row grammar: `| id | line ≤60 chars | why ≤80 chars | → verb |` where **verb comes ONLY from**: `delete · rewrite · keep · disable · merge · verify`
-- The `line` cell quotes the marker VERBATIM from the file (never paraphrase — paraphrase breaks diff-checking and decisions matching)
-- `why` is one line, prefixed `fact:` when it restates a Phase 1 measurement, `[INFERENCE]` when it is judgment
+- Row grammar: `| id | where | line ≤60 chars | why ≤80 chars | B | → verb |` where **verb comes ONLY from**: `delete · rewrite · keep · disable · merge · verify` (the cell holds the bare word — the `→` belongs to the header only). A literal `|` inside a cell is written `\|`.
+- `where` = the ABSOLUTE path of the audited file + `:<line>` (a block: `:<from>-<to>`). A conflict row names both places: `<pathA>:<n> ⇄ <pathB>:<m>`.
+- `B` = integer bytes of the span the verb removes or replaces (`0` for `keep` / `verify`) — digits only, no separators or units. The executive line's `shed` = Σ B of delete/rewrite/merge/disable rows ÷ corpus bytes.
+- The `line` cell quotes the marker VERBATIM from the file (never paraphrase — paraphrase breaks diff-checking and decisions matching). On a conflict row it quotes side A, and `why` carries side B's verbatim quote: `conflict: B says «…» — <what differs>`
+- `why` is one line: `<category>: <reason>`, category from the closed set `trained-dup · relic · 90%-rule · conflict · few-shot · dead-ref · mcp · invariant`; `fact:` (restates a Phase 1 measurement) or `[INFERENCE]` (judgment) comes right after the category, e.g. `trained-dup: [INFERENCE] the model does this unprompted`
 
 ### 1. Executive block (top of the file)
 
@@ -78,11 +80,11 @@ Severity is inherited, never invented: 🔴 = meter-backed disable or a conflict
 python <hiviz>/render/report.py --md .hiviz/report.md --out .hiviz/report.html
 ```
 
-Tell the user both paths. The HTML is a generated view — never hand-edit it.
+Tell the user both paths. The HTML is a generated view — never hand-edit it. It sorts by effect, batches decisions by category, and exports `decisions.md`; nothing in it is pre-decided.
 
 ### Decisions file
 
-`.hiviz/decisions.md` mirrors the body: same literal headers, same order, same rows, plus an empty `DECISION` column (`yes / no / as-condition / keep`). The user fills it top-down — most important first.
+`.hiviz/decisions.md` mirrors the body: same literal headers, same order, same rows (every column), plus an empty `DECISION` column (`yes / no / as-condition / keep`). The user fills it top-down — most important first — by hand or in the HTML view, which decides row by row and exports this same file.
 
 Print the executive block into the chat (verbatim) and STOP.
 
