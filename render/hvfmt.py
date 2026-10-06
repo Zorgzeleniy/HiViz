@@ -6,10 +6,12 @@ Two output modes:
   pretty  box-drawing tables, status symbols, color — for a human at a terminal
 Resolution: --format > $HIVIZ_FORMAT > pretty when stdout is a TTY, else md.
 Color only in pretty mode on a TTY; NO_COLOR turns it off, FORCE_COLOR forces it.
-Symbols fall back to ASCII when the stream encoding cannot carry them.
+Symbols fall back to ASCII when the stream encoding cannot carry them; HIVIZ_ASCII=1 forces that
+(a console font without ✔ ◐ ⠋ …).
 """
 from __future__ import annotations
 
+import atexit
 import os
 import re
 import shutil
@@ -88,14 +90,24 @@ def _enable_vt(stream) -> bool:
         handle = msvcrt.get_osfhandle(stream.fileno())
         mode = ctypes.c_ulong()
         if not k32.GetConsoleMode(handle, ctypes.byref(mode)):
-            return False
-        return bool(k32.SetConsoleMode(handle, mode.value | 0x0004))  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            return False   # not a console (redirected)
+        if mode.value & 0x0004:
+            return True
+        if not k32.SetConsoleMode(handle, mode.value | 0x0004):  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            return False   # legacy console
+        atexit.register(k32.SetConsoleMode, handle, mode.value)  # leave the console as we found it
+        return True
     except Exception:
         return False
 
 
 def configure(fmt: str | None = "auto", stream=None) -> bool:
     """Resolve the mode once at startup; returns True for pretty."""
+    for name in ("stdout", "stderr"):   # a redirected cp866/cp437 stream must degrade to '?', never crash
+        try:
+            getattr(sys, name).reconfigure(errors="replace")
+        except Exception:
+            pass
     stream = stream or sys.stdout
     tty = _isatty(stream)
     if not fmt or fmt == "auto":
@@ -114,6 +126,8 @@ def configure(fmt: str | None = "auto", stream=None) -> bool:
         _GLYPHS.encode(getattr(stream, "encoding", None) or "ascii")
         uni = True
     except (UnicodeEncodeError, LookupError):
+        uni = False
+    if os.environ.get("HIVIZ_ASCII"):
         uni = False
     if pretty and not uni:
         for name in ("stdout", "stderr"):

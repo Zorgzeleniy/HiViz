@@ -353,6 +353,7 @@ def corpus_bytes(text: str) -> int | None:
 
 def parse(md: str, title: str = "report") -> Report | None:
     """Funnel structure or None (the caller falls back to the generic view)."""
+    md = md.lstrip("\ufeff")   # Windows editors / PowerShell prepend a BOM
     chunks, cur, fence = [], [], False
     for line in md.splitlines():
         if line.strip().startswith("```"):
@@ -409,20 +410,37 @@ def all_rows(rep: Report) -> list[Row]:
     return [r for s in rep.sections for r in s["rows"]]
 
 
+_DRIVE = re.compile(r"^[A-Za-z]:/")
+
+
+def posix(p: str) -> str:
+    """Windows paths (C:\\x\\y, C:/x/y, \\\\host\\share) -> forward slashes, for display and prefix math."""
+    return p.replace("\\", "/") if "\\" in p and ("/" not in p or re.match(r"^(?:[A-Za-z]:|\\\\)", p)) else p
+
+
+def _fold(p: str) -> str:
+    return p.lower() if _DRIVE.match(p) else p   # drive paths are case-insensitive
+
+
 def common_dir(rows: list[Row]) -> str:
-    dirs = [os.path.dirname(split_loc(p)[0]) for r in rows for p in (r.where, r.other) if p and "/" in split_loc(p)[0]]
+    dirs = [posix(split_loc(p)[0]).rpartition("/")[0] for r in rows for p in (r.where, r.other)
+            if p and "/" in posix(split_loc(p)[0])]
     if not dirs:
         return ""
-    try:
-        c = os.path.commonpath(dirs)
-    except ValueError:
-        return ""
-    return c if c not in ("", "/") else ""
+    fold = (lambda x: x.lower()) if all(_DRIVE.match(d + "/") for d in dirs) else (lambda x: x)
+    common = []
+    for segs in zip(*(d.split("/") for d in dirs)):
+        if len({fold(x) for x in segs}) != 1:
+            break
+        common.append(segs[0])
+    base = "/".join(common)
+    return "" if base in ("", "/") or re.fullmatch(r"[A-Za-z]:", base) else base
 
 
 def short(loc: str, base: str) -> str:
     path, ln = split_loc(loc)
-    if base and path.startswith(base + "/"):
+    path = posix(path)
+    if base and _fold(path).startswith(_fold(base) + "/"):
         path = path[len(base) + 1:]
     return path + (f":{ln}" if ln else "")
 
@@ -725,7 +743,7 @@ def main() -> int:
     if not a.out and not a.summary:
         print("nothing to do: pass --out <file.html> and/or --summary", file=sys.stderr)
         return 2
-    md = src.read_text(encoding="utf-8")
+    md = src.read_text(encoding="utf-8-sig")
     if a.out:
         html = render(md, src.stem)
         Path(a.out).write_text(html, encoding="utf-8")
