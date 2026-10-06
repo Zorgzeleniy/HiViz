@@ -18,6 +18,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "render"))
+import hvfmt  # noqa: E402
+
 EDIT_TOOLS = {"edit", "write", "Edit", "Write", "MultiEdit", "NotebookEdit", "apply_patch", "multi_edit"}
 SHELL_TOOLS = {"shell", "local_shell", "exec_command", "bash", "Bash"}  # count only when running a patch
 META_KEYS = ('"model_change"', '"session_info"', '"turn_context"', '"session_meta"',
@@ -186,6 +189,33 @@ def verified_from(constitution_json: Path | None, marker: str) -> list[dict]:
     return out
 
 
+def print_pretty(loc: str, marker: str, ledger: list, events: list, verified: list) -> int:
+    print(hvfmt.heading("blame", loc))
+    if marker:
+        print(hvfmt.style(f"“{marker[:160]}”", "dim"))
+    rows = []
+    for e in ledger:
+        rows.append(["ledger", str(e.get("written_at", "?")), str(e.get("model", "?")),
+                     f"{e.get('action', '?')} — {e.get('reason', '?')}"])
+    for e in events[-5:]:
+        rows.append(["history", e["ts"], e["model"],
+                     f"{e['tool']} · session \"{e['session']}\"" + (" · TOUCHED THIS LINE" if e["touched_line"] else "")])
+    for v in verified:
+        rows.append(["verified", "", "", f"{v.get('verdict')} by constitution test {v.get('id')}"])
+    if rows:
+        print(hvfmt.table(["source", "when", "model", "what"], rows, dim_cols=(0,)))
+    gaps = []
+    if not ledger:
+        gaps.append("no ledger entry — pre-hiviz history only")
+    if not events:
+        gaps.append("no edit/write events in the given session logs")
+    elif len(events) > 5:
+        gaps.append(f"showing the last 5 of {len(events)} edit/write events")
+    if gaps:
+        print(hvfmt.style("  " + " · ".join(gaps), "gray"))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="hiviz blame")
     ap.add_argument("--file", required=True)
@@ -195,7 +225,9 @@ def main() -> int:
                     help="session-log dir (repeatable; replaces the omp/pi/Claude/Codex defaults)")
     ap.add_argument("--ledger", default=None)
     ap.add_argument("--constitution", default=None)
+    hvfmt.add_format_arg(ap)
     a = ap.parse_args()
+    hvfmt.configure(a.format)
 
     target = Path(a.file)
     if not target.exists():
@@ -215,6 +247,8 @@ def main() -> int:
     verified = verified_from(Path(a.constitution) if a.constitution else None, marker)
 
     loc = f"{target.name}:{a.line}" if a.line else target.name
+    if hvfmt.is_pretty():
+        return print_pretty(loc, marker, ledger, events, verified)
     print(f"## {loc}")
     if marker:
         print(f"> {marker[:160]}")

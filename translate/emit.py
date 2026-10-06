@@ -30,6 +30,9 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "render"))
+import hvfmt  # noqa: E402
+
 KIND_ORDER = ["safety", "invariant", "rule", "fact"]
 TARGETS = {
     "omp": [("RULES.md", ["safety"]), ("AGENTS.md", ["invariant", "rule", "fact"])],
@@ -107,7 +110,7 @@ def emit(kept: list[dict], target: str, out: Path, name: str) -> None:
     for fname, content in render_target(kept, target, name).items():
         (out / fname).parent.mkdir(parents=True, exist_ok=True)
         (out / fname).write_text(content, encoding="utf-8")
-        print(f"  wrote {out / fname}")
+        print(f"  {hvfmt.symbol('OK')} wrote {out / fname}" if hvfmt.is_pretty() else f"  wrote {out / fname}")
         limit = CHAR_LIMITS.get(fname)
         if limit and len(content) > limit:
             print(f"  WARNING {fname}: {len(content):,} chars > {limit:,} — the harness truncates the rest",
@@ -116,15 +119,23 @@ def emit(kept: list[dict], target: str, out: Path, name: str) -> None:
 
 def check(kept: list[dict], target: str, live: Path, name: str) -> int:
     bad = 0
+    pretty = hvfmt.is_pretty()
+    table: list[list[str]] = []
     for fname, expected in render_target(kept, target, name).items():
         p = live / fname
         if not p.exists():
-            print(f"DIVERGED {fname}: file missing")
+            if pretty:
+                table.append(["FAIL", fname, "file missing"])
+            else:
+                print(f"DIVERGED {fname}: file missing")
             bad += 1
             continue
         actual = p.read_text(encoding="utf-8", errors="replace")
         if actual == expected:
-            print(f"OK       {fname}")
+            if pretty:
+                table.append(["OK", fname, "in sync"])
+            else:
+                print(f"OK       {fname}")
             continue
         a_lines = set(actual.splitlines())
         e_lines = set(expected.splitlines())
@@ -133,10 +144,20 @@ def check(kept: list[dict], target: str, live: Path, name: str) -> int:
         missing_text = "\n".join(missing)
         ids = [e["id"] for e in kept if e["text"].rstrip() in missing_text]
         hint = f"rules lost: {', '.join(ids)}" if ids else "content drift"
-        print(f"DIVERGED {fname}: {len(missing)} expected line(s) missing, "
-              f"{len(extra)} unexpected ({hint})")
+        detail = f"{len(missing)} expected line(s) missing, {len(extra)} unexpected ({hint})"
+        if pretty:
+            table.append(["FAIL", fname, detail])
+        else:
+            print(f"DIVERGED {fname}: {detail}")
         bad += 1
-    print(f"\n{len(TARGETS[target]) - bad}/{len(TARGETS[target])} files in sync" if TARGETS[target] else "")
+    total = len(TARGETS[target])
+    if pretty:
+        print(hvfmt.heading("translate --check", f"target: {target}"))
+        if table:
+            print(hvfmt.table(["status", "file", "detail"], table, status_col=0))
+        print(hvfmt.summary({"OK": total - bad, "FAIL": bad}, ["OK", "FAIL"]))
+    else:
+        print(f"\n{total - bad}/{total} files in sync" if total else "")
     return 1 if bad else 0
 
 
@@ -150,7 +171,8 @@ def report(kept: list[dict], dropped: list[dict], target: str, out: Path) -> Non
     for e in kept:
         lines.append(f"| {e['id']} | {e.get('kind')} | {e.get('source', '?')} |")
     (out / "translation-report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  wrote {out / 'translation-report.md'}")
+    print(f"  {hvfmt.symbol('OK')} wrote {out / 'translation-report.md'}" if hvfmt.is_pretty()
+          else f"  wrote {out / 'translation-report.md'}")
 
 
 def main() -> int:
@@ -161,7 +183,9 @@ def main() -> int:
     ap.add_argument("--name", default="Agent instructions")
     ap.add_argument("--check", action="store_true",
                     help="verify live files at --out against the IR emission instead of writing")
+    hvfmt.add_format_arg(ap)
     a = ap.parse_args()
+    hvfmt.configure(a.format)
     kept, dropped = load_ir(Path(a.ir))
     kinds = {k: sum(1 for e in kept if e.get("kind") == k) for k in KIND_ORDER}
     print(f"IR: {len(kept)} entries kept, {len(dropped)} dedup-dropped "

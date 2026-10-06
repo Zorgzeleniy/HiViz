@@ -28,6 +28,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "render"))
+import hvfmt  # noqa: E402
+
 
 try:
     import tiktoken
@@ -433,7 +436,9 @@ def main() -> int:
                     help="session-log dir to mine for usage (repeatable; replaces the omp/Claude/Codex defaults)")
     ap.add_argument("--out", default=".hiviz/mcp_footprint.json")
     ap.add_argument("--timeout", type=float, default=30.0)
+    hvfmt.add_format_arg(ap)
     args = ap.parse_args()
+    hvfmt.configure(args.format)
 
     registry, uniq = {}, []
     for label, path in discover_configs(args.config):
@@ -462,20 +467,42 @@ def main() -> int:
         r["last_used"] = u["last_used"] if (known and u) else None
     rows.sort(key=lambda r: -(r.get("bytes") or 0))
 
-    print("| server | harnesses | tools | bytes | tokens | calls | last used |")
-    print("|---|---|---:|---:|---:|---:|---|")
-    ok = 0
-    for r in rows:
-        if "error" in r:
-            print(f"| {r['server']} | {r['harnesses']} | ERR | {r['error']} | | | |", file=sys.stderr)
-        else:
-            mark = "~" if r["tokens_approx"] else ""
+    pretty = hvfmt.is_pretty()
+    if pretty:
+        print(hvfmt.heading("mcp footprint", f"{len(rows)} servers"))
+        top = max([r.get("tokens") or 0 for r in rows] + [1])
+        body, errs = [], []
+        for r in rows:
+            if "error" in r:
+                errs.append(r)
+                continue
             unknown = r.get("calls") is None
-            lu = "?" if unknown else (r.get("last_used") or "never")
-            calls = "?" if unknown else r["calls"]
-            print(f"| {r['server']} | {r['harnesses']} | {r['tools']} | {r['bytes']:,} | "
-                  f"{mark}{r['tokens']:,} | {calls} | {lu} |")
-            ok += 1
+            body.append([r["server"], r["harnesses"], str(r["tools"]), f"{r['bytes']:,}",
+                         ("~" if r["tokens_approx"] else "") + f"{r['tokens']:,}",
+                         hvfmt.bar(r["tokens"], top),
+                         "?" if unknown else str(r["calls"]),
+                         "?" if unknown else (r.get("last_used") or "never")])
+        if body:
+            print(hvfmt.table(["server", "harnesses", "tools", "bytes", "tokens", "weight", "calls", "last used"],
+                              body, align=["l", "l", "r", "r", "r", "l", "r", "l"], dim_cols=(1,)))
+        for r in errs:
+            print(f"{hvfmt.badge('ERROR')}  {r['server']} ({r['harnesses']}): {r['error']}", file=sys.stderr)
+        ok = len(body)
+    else:
+        print("| server | harnesses | tools | bytes | tokens | calls | last used |")
+        print("|---|---|---:|---:|---:|---:|---|")
+        ok = 0
+        for r in rows:
+            if "error" in r:
+                print(f"| {r['server']} | {r['harnesses']} | ERR | {r['error']} | | | |", file=sys.stderr)
+            else:
+                mark = "~" if r["tokens_approx"] else ""
+                unknown = r.get("calls") is None
+                lu = "?" if unknown else (r.get("last_used") or "never")
+                calls = "?" if unknown else r["calls"]
+                print(f"| {r['server']} | {r['harnesses']} | {r['tools']} | {r['bytes']:,} | "
+                      f"{mark}{r['tokens']:,} | {calls} | {lu} |")
+                ok += 1
     if rows:
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -483,7 +510,9 @@ def main() -> int:
         tmp.write_text(json.dumps({"generated": time.strftime("%Y-%m-%dT%H:%M:%S"), "rows": rows},
                                   indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(out)  # atomic
-    print(f"\n{ok}/{len(rows)} servers measured · json: {args.out}", file=sys.stderr)
+    print(f"\n{ok}/{len(rows)} servers measured · json: {args.out}" if not pretty else
+          hvfmt.style(f"  {ok}/{len(rows)} servers measured · json: {args.out}", "gray"),
+          file=sys.stderr)
     return 0
 
 if __name__ == "__main__":

@@ -19,6 +19,9 @@ import sys
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "render"))
+import hvfmt  # noqa: E402
+
 
 
 def run_check(check: dict, base: Path) -> tuple[str, str]:
@@ -112,7 +115,9 @@ def main() -> int:
     ap.add_argument("--mcp-min-tokens", type=int, default=500)
     ap.add_argument("--mcp-stale-days", type=int, default=30)
     ap.add_argument("--out", default=None, help="optional JSON output path")
+    hvfmt.add_format_arg(ap)
     a = ap.parse_args()
+    hvfmt.configure(a.format)
 
     facts_path = Path(a.facts)
     base = Path(a.base).resolve()
@@ -134,13 +139,21 @@ def main() -> int:
 
     order = {"STALE": 0, "ERROR": 1, "UNVERIFIABLE": 2, "OK": 3}
     rows.sort(key=lambda r: (order[r["status"]], r["id"]))
-    print("| status | fact | detail |")
-    print("|---|---|---|")
-    for r in rows:
-        print(f"| {r['status']} | {r['id']} | {r['detail']} |")
     bad = [r for r in rows if r["status"] in ("STALE", "ERROR")]
-    print(f"\n{len(rows) - len(bad)}/{len(rows)} facts OK · {len(bad)} need attention",
-          file=sys.stderr)
+    if hvfmt.is_pretty():
+        print(hvfmt.heading("drift", f"{len(rows)} facts · {facts_path}"))
+        print(hvfmt.table(["status", "fact", "detail"],
+                          [[r["status"], r["id"], r["detail"]] for r in rows], status_col=0))
+        counts = {s: sum(r["status"] == s for r in rows) for s in order}
+        print(hvfmt.summary(counts, list(order)) + hvfmt.style(
+            f"   → {len(bad)} need attention" if bad else "   → no drift", "gray"))
+    else:
+        print("| status | fact | detail |")
+        print("|---|---|---|")
+        for r in rows:
+            print(f"| {r['status']} | {r['id']} | {r['detail']} |")
+        print(f"\n{len(rows) - len(bad)}/{len(rows)} facts OK · {len(bad)} need attention",
+              file=sys.stderr)
     if a.out:
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).write_text(json.dumps(rows, indent=2), encoding="utf-8")

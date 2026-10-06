@@ -20,16 +20,41 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "render"))
+import hvfmt  # noqa: E402
 HOME = Path.home()
 OUT = REPO / "tests" / "out"
 GT = json.loads((REPO / "tests" / "ground_truth.json").read_text(encoding="utf-8"))
 PROFILE = HOME / ".omp/profiles/hiviz-test/agent"
 RESULTS: list[tuple[str, bool, str]] = []
+_GROUP = [""]
+GROUPS: list[str] = []
+_SECTION: list[str | None] = [None]
+
+
+def group_of(name: str) -> str:
+    return re.split(r"[ :\[]", name, 1)[0]
 
 
 def check(name: str, ok: bool, detail: str = "") -> None:
     RESULTS.append((name, ok, detail))
-    print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f" — {detail}" if detail else ""))
+    GROUPS.append(_SECTION[0] or group_of(name))
+    if not hvfmt.is_pretty():
+        print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f" — {detail}" if detail else ""))
+        return
+    g = GROUPS[-1]
+    if g != _GROUP[0]:
+        _GROUP[0] = g
+        print(hvfmt.style(f"  {g}", "bold"))
+    m = None if _SECTION[0] else re.match(rf"{re.escape(g)}( \[[^\]]+\])?: (.*)$", name)
+    label = f"{m.group(1).strip() + ' ' if m.group(1) else ''}{m.group(2)}" if m else name
+    line = f"    {hvfmt.symbol('PASS' if ok else 'FAIL')} {label}"
+    if not ok:  # passing checks stay quiet; their detail is in the md output / failures table
+        first = next((l.strip() for l in detail.splitlines() if l.strip()), "")
+        room = hvfmt.term_cols() - hvfmt.width(line) - 4
+        if first and room > 12:
+            line += "  " + hvfmt.style(first if len(first) <= room else first[: room - 1] + "…", "red")
+    print(line)
 
 def sh(cmd: list[str], timeout: int = 120, cwd: Path = REPO, **kw) -> subprocess.CompletedProcess:
     exe = shutil.which(cmd[0])  # Windows: npm is npm.cmd, node-installed CLIs need resolving
@@ -41,6 +66,22 @@ def sh(cmd: list[str], timeout: int = 120, cwd: Path = REPO, **kw) -> subprocess
     except subprocess.TimeoutExpired as e:
         out = ((e.stdout or b"").decode("utf-8", "replace") if isinstance(e.stdout, bytes) else (e.stdout or ""))
         return subprocess.CompletedProcess(cmd, 124, "", f"TIMEOUT after {timeout}s; partial stdout: {out[-300:]}")
+
+
+T2_HARNESS = os.environ.get("HIVIZ_T2_HARNESS", "omp")  # omp | opencode
+T2_MODEL = os.environ.get("HIVIZ_T2_MODEL", "opencode/big-pickle")  # opencode only
+
+
+def agent_cmd(prompt: str) -> list[str]:
+    if T2_HARNESS == "opencode":
+        return ["opencode", "run", "-m", T2_MODEL, "--dir", str(PROFILE), "--auto", prompt]
+    return ["omp", "--profile", "hiviz-test", "-p", prompt]
+
+
+def probe_hint() -> str:
+    if T2_HARNESS == "opencode":
+        return f'headless `opencode run -m {T2_MODEL} --dir {PROFILE.as_posix()} --auto "<ask>"`'
+    return 'headless `omp --profile hiviz-test -p "<ask>"`'
 
 
 def templated_copy(src: Path, dst: Path) -> None:
@@ -424,12 +465,37 @@ def meters_discovery_check() -> None:
         srv.shutdown()
 
 
+def format_checks() -> None:
+    drift = [sys.executable, "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml",
+             "--base", "tests/fixture"]
+    env = {k: v for k, v in os.environ.items() if k not in ("NO_COLOR", "FORCE_COLOR", "HIVIZ_FORMAT")}
+    md = sh(drift, env=env)
+    pr = sh(drift + ["--format", "pretty"], env=env)
+    col = sh(drift + ["--format", "pretty"], env={**env, "FORCE_COLOR": "1"})
+    nocol = sh(drift + ["--format", "pretty"], env={**env, "FORCE_COLOR": "1", "NO_COLOR": "1"})
+    viaenv = sh(drift, env={**env, "HIVIZ_FORMAT": "pretty"})
+    md_ok = md.stdout.startswith("| status | fact | detail |") and "╭" not in md.stdout and "\x1b" not in md.stdout
+    check("format: piped stdout stays markdown (agents, CI)", md_ok, md.stdout.splitlines()[0] if md.stdout else md.stderr[-80:])
+    pr_ok = "╭" in pr.stdout and "✘ STALE" in pr.stdout and "\x1b" not in pr.stdout and pr.stdout == viaenv.stdout
+    check("format: --format pretty / HIVIZ_FORMAT draw the table, no color off a TTY", pr_ok,
+          f"{len(pr.stdout.splitlines())} lines")
+    check("format: FORCE_COLOR colors, NO_COLOR wins", "\x1b[" in col.stdout and "\x1b" not in nocol.stdout)
+    for enc in ("ascii", "cp1252"):
+        a = sh(drift + ["--format", "pretty"], env={**env, "PYTHONIOENCODING": enc})
+        check(f"format: no crash on a {enc} stream, symbols fold to ASCII",
+              "Traceback" not in a.stderr and a.stdout.isascii() and "| x STALE" in a.stdout.replace("│", "|"),
+              (a.stderr.strip().splitlines() or [""])[-1])
+
+
 def t1() -> None:
-    print("== T1: deterministic ==")
+    print(hvfmt.heading("T1 · deterministic", "hermetic fake $HOME per harness · no model calls") if hvfmt.is_pretty()
+          else "== T1: deterministic ==")
+    _SECTION[0] = "installer / uninstall"
     installer_checks()
     uninstall_checks()
     uninstall_edge_checks()
     plugin_install_checks()
+    _SECTION[0] = None
 
     mcp_cfg = OUT / "mcp_rendered.json"
     _mcp = json.loads((REPO / "tests/fixture/agent/mcp.json").read_text(encoding="utf-8"))
@@ -574,6 +640,7 @@ def t1() -> None:
     check("translate: every target placed (omp split, safety first, cursor/windsurf rule frontmatter) + --check",
           tr_ok, f"7 targets, claude CLAUDE({len(cl['CLAUDE.md'].splitlines())}L)" if tr_ok
           else (tr_err or "content mismatch")[-160:])
+    format_checks()
     plugin_checks()
 
 # ---------------------------------------------------------------- T2
@@ -596,6 +663,16 @@ def profile_setup() -> None:
         for d in sorted(vendor.iterdir()):
             if d.is_dir():
                 shutil.copytree(d, PROFILE / "skills" / f"{name}-{d.name}")
+    if T2_HARNESS == "opencode":
+        apply_tpl = (REPO / "templates/skill-apply.md").read_text(encoding="utf-8")
+        (PROFILE / "skills/hv-apply").mkdir(parents=True)
+        (PROFILE / "skills/hv-apply/SKILL.md").write_text(
+            apply_tpl.replace("{{APPLY_BODY}}", (REPO / "core/APPLY.md").read_text(encoding="utf-8")),
+            encoding="utf-8")
+        # omp loads RULES.md natively; opencode needs it listed so the safety probes can quote it
+        (PROFILE / "opencode.json").write_text('{"instructions": ["RULES.md"]}\n', encoding="utf-8")
+        (PROFILE / ".agents").mkdir()
+        (PROFILE / ".agents/skills").symlink_to("../skills", target_is_directory=True)
     (PROFILE / "config.yml").write_text(
         "modelRoles:\n  default: zai/glm-5.3-flash:high\nmemory:\n  backend: local\n"
         "skills:\n  customDirectories:\n    - " + str(PROFILE / "skills").replace("\\", "/") + "\n",
@@ -617,18 +694,32 @@ DECISIONS = """# HiViz decisions (final — authored by the test operator)
 | {P}/skills/clean-skill/SKILL.md | every line | KEEP |
 
 Backups: next to each edited file, as `<name>.bak-<YYYYMMDD>`.
-Probes (pre-authorized, headless `omp --profile hiviz-test -p "<ask>"`; save answers to {O}/probes-before.md and {O}/probes-after.md):
+Probes (pre-authorized, {H}; save answers to {O}/probes-before.md and {O}/probes-after.md):
 - P1 ask: "Without extra text: quote your directives about secrets." expect marker: `redact`
 - P2 ask: "Without extra text: quote your directives about committing." expect marker: `explicit request`
 """
 
 
+def _file_hint(path: Path, label: str) -> str:
+    if not path.exists():
+        return f"{label}: not written yet"
+    return f"{label}: {len(path.read_text(encoding='utf-8', errors='replace').splitlines())} lines"
+
+
+def _bak_hint() -> str:
+    n = len(list(PROFILE.glob("**/*.bak-*")))
+    return f"{n} backup(s) written" if n else "no edits yet"
+
+
 def t2() -> None:
-    print("== T2: E2E on sandbox profile ==")
+    print(hvfmt.heading("T2 · end-to-end", f"{T2_HARNESS}"
+                        + (f" · {T2_MODEL}" if T2_HARNESS == "opencode" else "")
+                        + " · real model, ~10–20 min") if hvfmt.is_pretty()
+          else "== T2: E2E on sandbox profile ==")
     OUT.mkdir(parents=True, exist_ok=True)
     o = OUT.as_posix()
     profile_setup()
-    if not os.environ.get("ZAI_API_KEY"):
+    if T2_HARNESS == "omp" and not os.environ.get("ZAI_API_KEY"):
         # consistent online snapshot of the default profile's stored login (live db → use backup API)
         import sqlite3
         src_db = sqlite3.connect(str(HOME / ".omp/agent/agent.db"))
@@ -638,8 +729,15 @@ def t2() -> None:
         dst_db.close()
         src_db.close()
         check("t2: auth snapshot from default profile (agent.db)", (PROFILE / "agent.db").exists())
-    pf = sh(["omp", "--profile", "hiviz-test", "-p", "Reply with the single word OK."], timeout=180)
-    check("t2: profile pre-flight (omp boots)", "OK" in (pf.stdout or ""), (pf.stderr or "")[-120:])
+    with hvfmt.Phase(f"pre-flight: {T2_HARNESS} boots", budget=180) as ph:
+        pf = sh(agent_cmd("Reply with the single word OK."), timeout=180)
+        ph.status = "OK" if "OK" in (pf.stdout or "") else "FAIL"
+    check(f"t2: profile pre-flight ({T2_HARNESS} boots)", "OK" in (pf.stdout or ""),
+          "" if "OK" in (pf.stdout or "") else (pf.stderr or "")[-120:])
+    vendor_installed = sorted(p.name for p in (PROFILE / "skills").glob("superpowers-*"))[:3]
+    check("t2: popular vendor skills present in sandbox", len(vendor_installed) >= 3,
+          f"{len(list((PROFILE / 'skills').glob('superpowers-*')))} superpowers + "
+          f"{len(list((PROFILE / 'skills').glob('anthropic-*')))} anthropic")
     surfaces = [PROFILE / "AGENTS.md", PROFILE / "RULES.md",
                 PROFILE / "skills/smelly-skill/SKILL.md", PROFILE / "skills/clean-skill/SKILL.md",
                 PROFILE / "skills/superpowers-systematic-debugging/SKILL.md",
@@ -656,7 +754,10 @@ def t2() -> None:
     if reuse and report.exists() and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
         print("  [skip] reusing existing report.md (HIVIZ_REUSE=1)")
     else:
-        r = sh(["omp", "--profile", "hiviz-test", "-p", audit_prompt], timeout=1500)
+        with hvfmt.Phase("audit — model reads the corpus and writes report.md", budget=1500,
+                         hint=lambda: _file_hint(report, "report.md")) as ph:
+            r = sh(agent_cmd(audit_prompt), timeout=1500)
+            ph.status = "OK" if report.exists() else "FAIL"
         (OUT / "audit-last-output.txt").write_text(
             ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
     check("audit: completed & report written", report.exists(),
@@ -672,17 +773,19 @@ def t2() -> None:
     fx_files = {str(p): _h(p) for root in ["tests/fixture/agent", "tests/fixture/vendor"]
                 for p in (REPO / root).rglob("*") if p.is_file()}
     (OUT / "decisions.md").write_text(
-        DECISIONS.format(P=PROFILE.as_posix(), O=o),
+        DECISIONS.format(P=PROFILE.as_posix(), O=o, H=probe_hint()),
         encoding="utf-8")
     apply_prompt = (
         f"Use the hv-apply procedure. The decisions file is {o}/decisions.md — "
         "it is complete and final; apply exactly its rows, nothing else. "
         "Back up every edited file (.bak-<date>). The two probes at the bottom are pre-authorized: "
         f"run them before and after the edits and save answers to {o}/probes-before.md "
-        f"and {o}/probes-after.md (headless `omp --profile hiviz-test -p \"<ask>\"`). "
+        f"and {o}/probes-after.md ({probe_hint()}). "
         "ORDER: make ALL file edits FIRST, then run the probes (before-snapshot from backups is acceptable "
         "if the session budget is tight). Do not commit. English.")
-    r = sh(["omp", "--profile", "hiviz-test", "-p", apply_prompt], timeout=2400)
+    with hvfmt.Phase("apply — model edits files, then runs probes", budget=2400,
+                     hint=lambda: _bak_hint()) as ph:
+        r = sh(agent_cmd(apply_prompt), timeout=2400)
     (OUT / "apply-last-output.txt").write_text(
         ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
     changed_fx = [p for p, h in fx_files.items() if _h(p) != h]
@@ -704,18 +807,30 @@ def t2() -> None:
     pa = OUT / "probes-after.md"
     check("apply: probes ran", pa.exists() and "redact" in pa.read_text(encoding="utf-8").lower(),
           "probes-after.md with safety quote" if pa.exists() else "no probes-after.md")
-    vendor_installed = sorted(p.name for p in (PROFILE / "skills").glob("superpowers-*"))[:3]
-    check("t2: popular vendor skills present in sandbox", len(vendor_installed) >= 3,
-          f"{len(list((PROFILE / 'skills').glob('superpowers-*')))} superpowers + "
-          f"{len(list((PROFILE / 'skills').glob('anthropic-*')))} anthropic")
     with open(REPO / "tests/results.log", "a", encoding="utf-8") as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M')} model=glm-5.3-flash:high "
+        f.write(f"{time.strftime('%Y-%m-%d %H:%M')} harness={T2_HARNESS} "
+                f"model={T2_MODEL if T2_HARNESS == 'opencode' else 'glm-5.3-flash:high'} "
                 f"passed={len(RESULTS) - len([r for r in RESULTS if not r[1]])}/{len(RESULTS)}\n")
 
 
-def summary() -> int:
+def summary(elapsed: float = 0.0) -> int:
     failed = [r for r in RESULTS if not r[1]]
-    print(f"\n== {len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed ==")
+    if not hvfmt.is_pretty():
+        print(f"\n== {len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed ==")
+        return 1 if failed else 0
+    groups: dict[str, list[bool]] = {}
+    for (name, ok, _), g in zip(RESULTS, GROUPS):
+        groups.setdefault(g, []).append(ok)
+    rows = [["PASS" if all(v) else "FAIL", g, f"{sum(v)}/{len(v)}",
+             hvfmt.bar(sum(v), len(v))] for g, v in groups.items()]
+    print(hvfmt.heading("results"))
+    print(hvfmt.table(["", "group", "passed", "progress"], rows, status_col=0, align=["l", "l", "r", "l"]))
+    if failed:
+        print(hvfmt.heading("failures"))
+        print(hvfmt.table(["check", "detail"], [[n, " ".join(d.split()) or "—"] for n, _, d in failed]))
+    total = len(RESULTS)
+    print("\n" + hvfmt.rule(f"{total - len(failed)}/{total} checks passed · {hvfmt.duration(elapsed)}",
+                           "FAIL" if failed else "PASS"))
     return 1 if failed else 0
 
 
@@ -725,12 +840,15 @@ def main() -> int:
     ap.add_argument("--t1", action="store_true")
     ap.add_argument("--t2", action="store_true")
     ap.add_argument("--all", action="store_true")
+    hvfmt.add_format_arg(ap)
     a = ap.parse_args()
+    hvfmt.configure(a.format)
+    t0 = time.monotonic()
     if a.t1 or a.all or not (a.t1 or a.t2):
         t1()
     if a.t2 or a.all:
         t2()
-    return summary()
+    return summary(time.monotonic() - t0)
 
 
 if __name__ == "__main__":

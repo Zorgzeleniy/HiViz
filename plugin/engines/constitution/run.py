@@ -20,8 +20,12 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "render"))
+import hvfmt  # noqa: E402
 
 
 VERDICT_ORDER = {"FAIL": 0, "ERROR": 1, "ORPHANED": 2, "FLAKY": 3, "PASS": 4}
@@ -164,7 +168,9 @@ def main() -> int:
     ap.add_argument("--corpus", default=None, help="dir to check guards against (orphaned)")
     ap.add_argument("--timeout", type=float, default=240.0)
     ap.add_argument("--out", default=None)
+    hvfmt.add_format_arg(ap)
     a = ap.parse_args()
+    hvfmt.configure(a.format)
 
     harness = HARNESSES.get(a.harness, a.harness)
     if harness == "auto":
@@ -174,24 +180,44 @@ def main() -> int:
             return 2
 
     tests = load_tests(Path(a.tests))
+    pretty = hvfmt.is_pretty()
+    if pretty:
+        print(hvfmt.heading("constitution", f"{len(tests)} probes · harness: {harness.split()[0]}"))
     rows = []
+    secs = {}
     retried = {}
-    for t in tests:
-        verdict, detail = judge(t, harness, Path(a.corpus) if a.corpus else None, a.timeout, retried)
+    for i, t in enumerate(tests, 1):
+        t0 = time.monotonic()
+        if pretty:
+            with hvfmt.Phase(f"[{i}/{len(tests)}] {t['id']}", transient=True) as ph:
+                verdict, detail = judge(t, harness, Path(a.corpus) if a.corpus else None, a.timeout, retried)
+                ph.status, ph.note = verdict, "" if verdict == "PASS" else detail
+        else:
+            verdict, detail = judge(t, harness, Path(a.corpus) if a.corpus else None, a.timeout, retried)
+        secs[t["id"]] = time.monotonic() - t0
         rows.append({"id": t["id"], "verdict": verdict, "severity": t.get("severity", "normal"),
                      "guards": t.get("guards", ""), "ask": t.get("ask", ""), "detail": detail})
-        print(f"  {verdict:8} {t['id']}" + (f" — {detail}" if verdict != "PASS" else ""))
+        if not pretty:
+            print(f"  {verdict:8} {t['id']}" + (f" — {detail}" if verdict != "PASS" else ""))
 
     rows.sort(key=lambda r: (VERDICT_ORDER[r["verdict"]], r["id"]))
-    print("\n| verdict | test | guards |")
-    print("|---|---|---|")
-    for r in rows:
-        print(f"| {r['verdict']} | {r['id']} | {r['guards'][:60]} |")
     failed = [r for r in rows if r["verdict"] in ("FAIL", "ERROR")]
     flaky = [r for r in rows if r["verdict"] == "FLAKY"]
     orphaned = [r for r in rows if r["verdict"] == "ORPHANED"]
-    print(f"\n{len(rows) - len(failed)}/{len(rows)} green · {len(flaky)} flaky · "
-          f"{len(orphaned)} orphaned", file=sys.stderr)
+    if pretty:
+        print(hvfmt.table(["verdict", "test", "guards", "time", "detail"],
+                          [[r["verdict"], r["id"], r["guards"][:60], hvfmt.duration(secs[r["id"]]),
+                            "" if r["verdict"] == "PASS" else r["detail"]] for r in rows],
+                          status_col=0, align=["l", "l", "l", "r", "l"]))
+        print(hvfmt.summary({v: sum(r["verdict"] == v for r in rows) for v in VERDICT_ORDER},
+                            sorted(VERDICT_ORDER, key=VERDICT_ORDER.get)))
+    else:
+        print("\n| verdict | test | guards |")
+        print("|---|---|---|")
+        for r in rows:
+            print(f"| {r['verdict']} | {r['id']} | {r['guards'][:60]} |")
+        print(f"\n{len(rows) - len(failed)}/{len(rows)} green · {len(flaky)} flaky · "
+              f"{len(orphaned)} orphaned", file=sys.stderr)
     if a.out:
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).write_text(json.dumps(rows, indent=2), encoding="utf-8")
