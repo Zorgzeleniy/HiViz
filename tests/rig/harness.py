@@ -17,24 +17,27 @@ import os
 import queue
 import shutil
 import subprocess
+import tempfile
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .core import home_env, sh
+from .core import home_env
 
+OMP_PROFILE = "hiviz-test"   # the isolated omp profile the T2 sandbox lives in
 _KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "ZAI_API_KEY", "OPENCODE_API_KEY")
 
 
 def harness_env(home: Path) -> dict:
     """Environment of a fake machine for ANY harness CLI: every config/data dir inside `home`, no credentials."""
+    # Only XDG dirs are pinned. CODEX_HOME / PI_CODING_AGENT_DIR / CLAUDE_CONFIG_DIR are REMOVED (home_env), not set:
+    # omp also honors PI_CODING_AGENT_DIR as its agent dir, so setting it for pi hid omp's skills.
     env = home_env(home, XDG_CONFIG_HOME=str(home / ".config"), XDG_DATA_HOME=str(home / ".local/share"),
-                   XDG_CACHE_HOME=str(home / ".cache"), CODEX_HOME=str(home / ".codex"),
-                   PI_CODING_AGENT_DIR=str(home / ".pi/agent"), CLAUDE_CONFIG_DIR=str(home / ".claude"))
+                   XDG_CACHE_HOME=str(home / ".cache"))
     for k in _KEYS:
         env.pop(k, None)
-    (home / ".codex").mkdir(parents=True, exist_ok=True)   # codex refuses to start when CODEX_HOME does not exist
+    (home / ".codex").mkdir(parents=True, exist_ok=True)   # codex insists on its home directory existing
     return env
 
 
@@ -43,8 +46,9 @@ class _Jsonl:
 
     def __init__(self, argv: list[str], env: dict, cwd: Path):
         exe = shutil.which(argv[0]) or argv[0]
+        self._err = tempfile.TemporaryFile()   # a file, not a pipe: nobody drains it, and it explains an early exit
         self.p = subprocess.Popen([exe, *argv[1:]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
+                                  stderr=self._err, text=True, encoding="utf-8", errors="replace",
                                   env=env, cwd=cwd)
         self.q: queue.Queue = queue.Queue()
         threading.Thread(target=self._pump, daemon=True).start()
@@ -70,7 +74,9 @@ class _Jsonl:
             except queue.Empty:
                 raise TimeoutError("no matching message from the CLI") from None
             if msg is None:
-                raise RuntimeError("the CLI exited before answering")
+                self._err.seek(0)
+                tail = " ".join(self._err.read().decode("utf-8", "replace").split())[-220:]
+                raise RuntimeError("the CLI exited before answering" + (f": {tail}" if tail else ""))
             if match(msg):
                 return msg
             if time.monotonic() > end:
@@ -79,15 +85,23 @@ class _Jsonl:
     def close(self) -> None:
         self.p.kill()
         self.p.wait()
+        self._err.close()
 
 
 # ---- discovery: names the real CLI lists (skills, plus slash commands for Claude Code)
-def _opencode(home: Path, cwd: Path) -> set[str]:
-    r = sh(["opencode", "debug", "skill"], env=harness_env(home), cwd=cwd, timeout=120)
-    return {s["name"] for s in json.loads(r.stdout)}
+def _opencode(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
+    # `opencode debug skill` truncates its output at exactly 64 KiB when stdout is a pipe (the T2 sandbox lists 20+
+    # skills = 260 KB), so it writes to a file, which is complete.
+    out = home / "opencode-skills.json"
+    with open(out, "wb") as fh:
+        r = subprocess.run([shutil.which("opencode") or "opencode", "debug", "skill"], stdout=fh, stderr=subprocess.PIPE,
+                           env=harness_env(home), cwd=cwd, timeout=120)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.decode("utf-8", "replace")[-200:] or f"exit {r.returncode}")
+    return {s["name"] for s in json.loads(out.read_text(encoding="utf-8"))}
 
 
-def _pi(home: Path, cwd: Path) -> set[str]:
+def _pi(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
     j = _Jsonl(["pi", "--mode", "rpc", "--no-session"], harness_env(home), cwd)
     try:
         j.send({"id": "1", "type": "get_commands"})
@@ -97,7 +111,7 @@ def _pi(home: Path, cwd: Path) -> set[str]:
         j.close()
 
 
-def _codex(home: Path, cwd: Path) -> set[str]:
+def _codex(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
     j = _Jsonl(["codex", "app-server"], harness_env(home), cwd)
     try:
         j.send({"jsonrpc": "2.0", "id": 1, "method": "initialize",
@@ -112,7 +126,7 @@ def _codex(home: Path, cwd: Path) -> set[str]:
         j.close()
 
 
-def _claude(home: Path, cwd: Path) -> set[str]:
+def _claude(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
     """The stream-json `init` event lists commands and skills BEFORE the first model call; kill right after it."""
     j = _Jsonl(["claude", "-p", "hi", "--output-format", "stream-json", "--verbose", "--no-session-persistence"],
                harness_env(home), cwd)
@@ -123,9 +137,26 @@ def _claude(home: Path, cwd: Path) -> set[str]:
         j.close()
 
 
+def _omp(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
+    """omp's RPC `get_available_commands` lists skills as `skill:<name>`. omp refuses to start without a default
+    model, so it gets a placeholder key; nothing is sent to a provider because no prompt is ever submitted."""
+    env = harness_env(home)
+    env["ANTHROPIC_API_KEY"] = "sk-ant-placeholder-never-sent"
+    argv = ["omp", *(["--profile", profile] if profile else []), "--mode", "rpc", "--no-session"]
+    j = _Jsonl(argv, env, cwd)
+    try:
+        j.send({"id": "1", "type": "get_available_commands"})
+        r = j.recv(lambda m: m.get("id") == "1" and m.get("type") == "response", 90)
+        if not r.get("success"):
+            raise RuntimeError(r.get("error", "get_available_commands failed"))
+        return {c["name"].removeprefix("skill:") for c in r["data"]["commands"] if c.get("source") == "skill"}
+    finally:
+        j.close()
+
+
 # ---- model runs (only what has been run end to end)
-def _omp(prompt: str, sandbox: Path, model: str) -> list[str]:
-    return ["omp", "--profile", "hiviz-test", "-p", prompt]
+def _omp_run(prompt: str, sandbox: Path, model: str) -> list[str]:
+    return ["omp", "--profile", OMP_PROFILE, "-p", prompt]
 
 
 def _opencode_run(prompt: str, sandbox: Path, model: str) -> list[str]:
@@ -136,15 +167,18 @@ def _opencode_run(prompt: str, sandbox: Path, model: str) -> list[str]:
 class Harness:
     name: str
     cli: str
-    discover: Callable[[Path, Path], set[str]] | None = None   # (fake home, cwd) -> names the CLI lists
+    discover: Callable[[Path, Path, str | None], set[str]] | None = None   # (fake home, cwd, profile) -> names the CLI lists
     commands: bool = False                                     # hiviz installs slash COMMANDS for it (Claude Code)
     argv: Callable[[str, Path, str], list[str]] | None = None  # (prompt, sandbox, model) -> command
     skills_dir: str | None = None                              # project-local skills dir the T2 sandbox fills
+    profile: str | None = None                                 # isolated profile the T2 sandbox lives in (omp)
+    sandbox_dir: Callable[[Path, Path], Path] | None = None    # (fake home, project) -> where the T2 sandbox is built
     extras: dict[str, str] = field(default_factory=dict)       # extra sandbox files the harness needs
 
 
 HARNESSES: dict[str, Harness] = {h.name: h for h in (
-    Harness("omp", "omp", argv=_omp),
+    Harness("omp", "omp", discover=_omp, argv=_omp_run, profile=OMP_PROFILE,
+            sandbox_dir=lambda home, project: home / ".omp/profiles" / OMP_PROFILE / "agent"),
     Harness("opencode", "opencode", discover=_opencode, argv=_opencode_run, skills_dir=".agents/skills",
             extras={"opencode.json": '{"instructions": ["RULES.md"]}\n'}),
     Harness("claude", "claude", discover=_claude, commands=True, skills_dir=".claude/skills"),

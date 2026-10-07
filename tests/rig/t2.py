@@ -43,40 +43,40 @@ def probe_hint() -> str:
 
 
 # ---------------------------------------------------------------- T2
-def profile_setup() -> None:
-    h = adapter()   # first: an unsupported HIVIZ_T2_HARNESS must not touch the sandbox
-    if PROFILE.parent.exists():
-        shutil.rmtree(PROFILE.parent)
-    PROFILE.mkdir(parents=True)
+def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None:
+    """Build the T2 sandbox: planted corpus + the hiviz skills rendered from the checkout + the harness's own wiring.
+    Parameters let T1 build the exact same layout somewhere else and ask the real CLI whether it sees it."""
+    h = h or adapter()   # first: an unsupported HIVIZ_T2_HARNESS must not touch the sandbox
+    prof = profile or PROFILE
+    if prof.parent.exists():
+        shutil.rmtree(prof.parent)
+    prof.mkdir(parents=True)
     src = REPO / "tests/fixture/agent"
     for item in ["AGENTS.md", "RULES.md", "mcp.json", "skills"]:
         s = src / item
-        d = PROFILE / item
+        d = prof / item
         (shutil.copytree if s.is_dir() else shutil.copy2)(s, d)
     # render from the checkout — T1 no longer installs into the real ~/.omp
-    tpl = (REPO / "templates/skill.md").read_text(encoding="utf-8")
-    (PROFILE / "skills/hv-audit").mkdir(parents=True)
-    (PROFILE / "skills/hv-audit/SKILL.md").write_text(
-        tpl.replace("{{AUDIT_BODY}}", (REPO / "core/AUDIT.md").read_text(encoding="utf-8")), encoding="utf-8")
+    for name, tpl, key, core in (("hv-audit", "skill.md", "{{AUDIT_BODY}}", "AUDIT.md"),
+                                 ("hv-apply", "skill-apply.md", "{{APPLY_BODY}}", "APPLY.md")):
+        (prof / "skills" / name).mkdir(parents=True)   # both: omp's --profile does not see the global install
+        text = (REPO / "templates" / tpl).read_text(encoding="utf-8")
+        (prof / "skills" / name / "SKILL.md").write_text(
+            text.replace(key, (REPO / "core" / core).read_text(encoding="utf-8")), encoding="utf-8")
     for name, sub in [("superpowers", "superpowers/skills"), ("anthropic", "anthropic-skills/skills")]:
         vendor = REPO / "tests/fixture/vendor" / sub
         for d in sorted(vendor.iterdir()):
             if d.is_dir():
-                shutil.copytree(d, PROFILE / "skills" / f"{name}-{d.name}")
+                shutil.copytree(d, prof / "skills" / f"{name}-{d.name}")
     if h.skills_dir:   # harnesses other than omp read skills from a project-local dir
-        apply_tpl = (REPO / "templates/skill-apply.md").read_text(encoding="utf-8")
-        (PROFILE / "skills/hv-apply").mkdir(parents=True)
-        (PROFILE / "skills/hv-apply/SKILL.md").write_text(
-            apply_tpl.replace("{{APPLY_BODY}}", (REPO / "core/APPLY.md").read_text(encoding="utf-8")),
-            encoding="utf-8")
-        link = PROFILE / h.skills_dir
+        link = prof / h.skills_dir
         link.parent.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(os.path.relpath(PROFILE / "skills", link.parent), target_is_directory=True)
+        link.symlink_to(os.path.relpath(prof / "skills", link.parent), target_is_directory=True)
         for rel, text in h.extras.items():   # e.g. opencode must be told to load RULES.md so the safety probes can quote it
-            (PROFILE / rel).write_text(text, encoding="utf-8")
-    (PROFILE / "config.yml").write_text(
+            (prof / rel).write_text(text, encoding="utf-8")
+    (prof / "config.yml").write_text(
         "modelRoles:\n  default: zai/glm-5.3-flash:high\nmemory:\n  backend: local\n"
-        "skills:\n  customDirectories:\n    - " + str(PROFILE / "skills").replace("\\", "/") + "\n",
+        "skills:\n  customDirectories:\n    - " + str(prof / "skills").replace("\\", "/") + "\n",
         encoding="utf-8")
 
 

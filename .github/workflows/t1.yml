@@ -46,11 +46,17 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2" # omp needs bun >= 1.3.14
       - name: install the harness CLIs
-        run: npm install -g @anthropic-ai/claude-code@2.1.292 @openai/codex@0.160.1 @mariozechner/pi-coding-agent@0.73.1 opencode-ai@1.18.34
+        run: |
+          npm install -g @anthropic-ai/claude-code@2.1.292 @openai/codex@0.160.1 @mariozechner/pi-coding-agent@0.73.1 opencode-ai@1.18.34
+          bun install -g @oh-my-pi/pi-coding-agent@18.7.0
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
       - name: T1 with every discoverable harness required
         env:
-          HIVIZ_REQUIRE_HARNESSES: claude,codex,pi,opencode
+          HIVIZ_REQUIRE_HARNESSES: claude,codex,pi,opencode,omp
         run: python tests/run.py --t1
 
   t1:

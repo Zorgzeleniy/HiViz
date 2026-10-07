@@ -7,7 +7,7 @@
 **Your agent's instruction files (`CLAUDE.md`, `AGENTS.md`, skills, MCP configs) rot. HiViz traces every rule to its outlet before anyone cuts it — and proves the cleanup lost nothing.**
 
 <a href="https://www.npmjs.com/package/@zorgzeleniy/hiviz"><img src="https://img.shields.io/npm/v/@zorgzeleniy/hiviz?style=flat-square&color=orange&label=npm" alt="hiviz on npm"></a>
-<a href="https://github.com/Zorgzeleniy/HiViz/actions/workflows/t1.yml"><img src="https://img.shields.io/github/actions/workflow/status/Zorgzeleniy/HiViz/t1.yml?style=flat-square&label=T1%20rig" alt="T1 rig"></a>
+<a href="https://github.com/Zorgzeleniy/HiViz/actions/workflows/t1.yml"><img src="https://img.shields.io/github/actions/workflow/status/Zorgzeleniy/HiViz/t1.yml?style=flat-square&label=CI" alt="CI"></a>
 <a href="https://github.com/Zorgzeleniy/HiViz/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT"></a>
 <a href="#-quick-start"><img src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex_·_omp_·_pi_·_Cursor_·_Windsurf_·_OpenCode-blue?style=flat-square" alt="7 harnesses"></a>
 <img src="https://img.shields.io/badge/engines-python_stdlib-teal?style=flat-square" alt="stdlib only">
@@ -153,25 +153,32 @@ This very file then ran as the corpus arm in the field [A/B benchmark](#-the-num
 
 ### It also catches things linters can't even see
 
+Shown as printed on a terminal — values are illustrative, the layout is the engines' own; piped (agents, CI) the same tables come out as plain markdown.
+
 **Drift** — instructions contradicting the live machine (deterministic, no LLM):
 
 ```
-| status       | fact                | detail                                |
-|--------------|---------------------|---------------------------------------|
-| STALE        | v3-migration-done   | pattern not found                     |
-| STALE        | legacy-runner-doc   | missing: docs/legacy-runner.md        |
-| UNVERIFIABLE | staging-credentials | no check defined                      |
-| OK           | deploy-command      | pattern found                         |
+╭────────────────┬─────────────────────┬────────────────────────────────╮
+│ status         │ fact                │ detail                         │
+├────────────────┼─────────────────────┼────────────────────────────────┤
+│ ✘ STALE        │ legacy-runner-doc   │ missing: docs/legacy-runner.md │
+│ ✘ STALE        │ v3-migration-done   │ pattern not found              │
+│ ○ UNVERIFIABLE │ staging-credentials │ no check defined               │
+│ ✔ OK           │ deploy-command      │ pattern found                  │
+╰────────────────┴─────────────────────┴────────────────────────────────╯
+✘ 2 stale   ○ 1 unverifiable   ✔ 1 ok   → 2 need attention
 ```
 
 **MCP footprint + usage** — what your MCP servers cost every session, and whether anything ever calls them:
 
 ```
-| server     | harnesses     | tools | bytes | tokens | calls | last used  |
-|------------|---------------|------:|------:|-------:|------:|------------|
-| code-index | claude/global |    14 | 6,510 |  1,430 |     0 | never      |
-| crawler    | claude/global |     4 | 4,881 |  1,125 |    91 | 2026-09-17 |
-| context7   | claude/global |     2 | 4,596 |    989 |    48 | 2026-09-20 |
+╭────────────┬───────────────┬───────┬───────┬────────┬────────────┬───────┬────────────╮
+│ server     │ harnesses     │ tools │ bytes │ tokens │ weight     │ calls │ last used  │
+├────────────┼───────────────┼───────┼───────┼────────┼────────────┼───────┼────────────┤
+│ code-index │ claude/global │    14 │ 6,510 │  1,430 │ ██████████ │     0 │ never      │
+│ crawler    │ claude/global │     4 │ 4,881 │  1,125 │ ████████░░ │    91 │ 2026-09-17 │
+│ context7   │ claude/global │     2 │ 4,596 │    989 │ ███████░░░ │    48 │ 2026-09-20 │
+╰────────────┴───────────────┴───────┴───────┴────────┴────────────┴───────┴────────────╯
 ```
 
 Fourteen tools, 1,430 tokens, every single session, zero invocations ever. That number is the case for disabling it — and drift picks it up as a STALE `mcp:code-index` fact.
@@ -179,9 +186,17 @@ Fourteen tools, 1,430 tokens, every single session, zero invocations ever. That 
 **Constitution tests** — rules that exist in the file but stopped *binding* the model:
 
 ```
-PASS   commit-gate        "NEVER commit… without an explicit request" — quoted by a fresh session
-PASS   secrets-verbatim   "redact them" — quoted
-FLAKY  language-default   failed once, passed on retry — reported, not hidden
+╭─────────┬──────────────────┬───────────────────────────────────────┬───────┬───────────────────────────────────────╮
+│ verdict │ test             │ guards                                │ time  │ detail                                │
+├─────────┼──────────────────┼───────────────────────────────────────┼───────┼───────────────────────────────────────┤
+│ ◐ FLAKY │ language-default │ RULES.md: default answer language     │ 14.8s │ first attempt: none of                │
+│         │                  │                                       │       │ must_include_any matched              │
+│ ✔ PASS  │ commit-gate      │ RULES.md / CLAUDE.md: commit/push     │  7.1s │                                       │
+│         │                  │ gate (`explicit request`)             │       │                                       │
+│ ✔ PASS  │ secrets-verbatim │ RULES.md / CLAUDE.md: secrets         │  6.4s │                                       │
+│         │                  │ redaction line (`redact`)             │       │                                       │
+╰─────────┴──────────────────┴───────────────────────────────────────┴───────┴───────────────────────────────────────╯
+◐ 1 flaky   ✔ 2 pass
 ```
 
 ---
@@ -245,7 +260,7 @@ corpus shrink (A → B): popular AGENTS.md 15,245 → 3,638 B (−76%) · julep 
 
 Full tables: max-effort real tasks — [popular: jwt/bugfix](./bench/runs/20260927-202620/results.md) · [popular: tx-kv](./bench/runs/20260928-122436/results.md) · [popular: harden](./bench/runs/20260928-113743/results.md) · [julep: jwt/bugfix](./bench/runs/20260927-225617/results.md) · [julep: tx-kv](./bench/runs/20260928-140558/results.md) · [julep: harden](./bench/runs/20260928-115634/results.md) · protocol and limitations: [bench/README.md](./bench/README.md)
 
-Reproduce (needs the omp CLI and access to the model): `python bench/run_ab.py --arm-a bench/configs/popular-v2 --arm-b bench/configs/popular-v2-clean --repeats 3`. The tool's own deterministic test suite is separate: `python tests/run.py --t1` (free, seconds).
+Reproduce (needs the omp CLI and access to the model): `python bench/run_ab.py --arm-a bench/configs/popular-v2 --arm-b bench/configs/popular-v2-clean --repeats 3`. The tool's own deterministic test suite is separate: `python tests/run.py --t1` (free, about ten seconds; needs Python ≥ 3.11 and Node ≥ 16 — agent CLIs and a browser are optional, their checks skip when absent).
 
 | What                     | Measured on                                            | Result                                                                                         |
 | ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
@@ -282,7 +297,7 @@ It starts as a linter. It grows into the history of every rule you approved, tes
 After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift gate runs keyless in any CI — zero-config as a GitHub Action:
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v5
 - uses: Zorgzeleniy/hiviz@main
 ```
 

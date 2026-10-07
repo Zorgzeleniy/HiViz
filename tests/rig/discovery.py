@@ -8,18 +8,10 @@ from __future__ import annotations
 import os
 import shutil
 
-from .core import REPO, _SECTION, check, fresh_home, home_env, sh
+from .core import _SECTION, check, fresh_home, home_env, sh
 from .harness import HARNESSES, cli_version
 from .installer import CMD_NAMES, HARNESS_MARKERS, SKILL_NAMES
-
-
-def _render_skills(project, skills_dir: str) -> None:
-    for name, tpl, key, core in (("hv-audit", "skill.md", "{{AUDIT_BODY}}", "AUDIT.md"),
-                                 ("hv-apply", "skill-apply.md", "{{APPLY_BODY}}", "APPLY.md")):
-        d = project / skills_dir / name
-        d.mkdir(parents=True, exist_ok=True)
-        text = (REPO / "templates" / tpl).read_text(encoding="utf-8")
-        (d / "SKILL.md").write_text(text.replace(key, (REPO / "core" / core).read_text(encoding="utf-8")), encoding="utf-8")
+from .t2 import profile_setup
 
 
 def discovery_checks() -> None:
@@ -38,19 +30,24 @@ def discovery_checks() -> None:
         (home / HARNESS_MARKERS[name]).mkdir(parents=True)
         init = sh(["node", "bin/hiviz.js", "init"], env=home_env(home))
         try:
-            seen, err = h.discover(home, home), ""
+            seen, err = h.discover(home, home, None), ""
         except Exception as e:   # a CLI change must fail loudly, with the reason
             seen, err = set(), f"{type(e).__name__}: {e}"
         check(f"harness [{name}]: after `hiviz init` the real CLI lists all {len(want)} hiviz {what} ({ver}, no model)",
               init.returncode == 0 and want <= seen, err or f"missing={sorted(want - seen)}")
-        if not h.skills_dir:
+        if not (h.skills_dir or h.profile):
             continue
-        project, empty = fresh_home(f"discover-{name}-sandbox"), fresh_home(f"discover-{name}-empty-home")
-        _render_skills(project, h.skills_dir)
+        # the sandbox T2 really builds (profile_setup), placed in a fresh fake machine, asked of the real CLI
+        box = fresh_home(f"discover-{name}-sandbox")
+        project = box / "project"
+        project.mkdir()
+        target = h.sandbox_dir(box, project) if h.sandbox_dir else project
+        profile_setup(profile=target, h=h)
+        layout = h.skills_dir or f"--profile {h.profile}"
         try:
-            seen, err = h.discover(empty, project), ""
+            seen, err = h.discover(box, project, h.profile), ""
         except Exception as e:
             seen, err = set(), f"{type(e).__name__}: {e}"
-        check(f"harness [{name}]: skills in the T2 sandbox layout ({h.skills_dir}) are discovered",
+        check(f"harness [{name}]: skills in the T2 sandbox as profile_setup builds it ({layout}) are discovered",
               {"hv-audit", "hv-apply"} <= seen, err or f"missing={sorted({'hv-audit', 'hv-apply'} - seen)}")
     _SECTION[0] = None
