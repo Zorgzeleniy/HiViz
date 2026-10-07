@@ -20,7 +20,7 @@ from rig.core import OUT, _SECTION, hvfmt, summary
 from rig.discovery import discovery_checks
 from rig.engines import engine_checks
 from rig.installer import installer_checks, plugin_checks, plugin_install_checks, uninstall_checks, uninstall_edge_checks
-from rig.output import format_checks, report_checks
+from rig.output import format_checks, installer_output_checks, json_checks, report_checks
 from rig.t2 import t2, t2x
 
 
@@ -35,6 +35,8 @@ def t1() -> None:
     _SECTION[0] = None
     engine_checks()
     format_checks()
+    json_checks()
+    installer_output_checks()
     report_checks()
     plugin_checks()
     discovery_checks()

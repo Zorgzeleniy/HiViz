@@ -183,6 +183,7 @@ def main() -> int:
 
     tests = load_tests(Path(a.tests))
     pretty = hvfmt.is_pretty()
+    as_json = hvfmt.is_json()
     if pretty:
         print(hvfmt.heading("constitution", f"{len(tests)} probes · harness: {harness.split()[0]}"))
     rows = []
@@ -199,14 +200,17 @@ def main() -> int:
         secs[t["id"]] = time.monotonic() - t0
         rows.append({"id": t["id"], "verdict": verdict, "severity": t.get("severity", "normal"),
                      "guards": t.get("guards", ""), "ask": t.get("ask", ""), "detail": detail})
-        if not pretty:
+        if not pretty and not as_json:
             print(f"  {verdict:8} {t['id']}" + (f" — {detail}" if verdict != "PASS" else ""))
 
     rows.sort(key=lambda r: (VERDICT_ORDER[r["verdict"]], r["id"]))
     failed = [r for r in rows if r["verdict"] in ("FAIL", "ERROR")]
     flaky = [r for r in rows if r["verdict"] == "FLAKY"]
     orphaned = [r for r in rows if r["verdict"] == "ORPHANED"]
-    if pretty:
+    if as_json:
+        print(hvfmt.dumps({"summary": {v: sum(r["verdict"] == v for r in rows) for v in VERDICT_ORDER},
+                           "failed": len(failed), "rows": [{**r, "seconds": round(secs[r["id"]], 3)} for r in rows]}))
+    elif pretty:
         print(hvfmt.table(["verdict", "test", "guards", "time", "detail"],
                           [[r["verdict"], r["id"], r["guards"][:60], hvfmt.duration(secs[r["id"]]),
                             "" if r["verdict"] == "PASS" else r["detail"]] for r in rows],

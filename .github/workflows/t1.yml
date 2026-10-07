@@ -34,6 +34,25 @@ jobs:
             echo "$out" | grep -q "needs Python >= 3.11"
           done
 
+  harness-discovery:
+    # The real harness CLIs must still see what `hiviz init` installs. No model, no credentials, no network calls to a provider.
+    # Versions are pinned: a CLI release that changes its skill discovery should fail HERE, once, on purpose.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: install the harness CLIs
+        run: npm install -g @anthropic-ai/claude-code@2.1.292 @openai/codex@0.160.1 @mariozechner/pi-coding-agent@0.73.1 opencode-ai@1.18.34
+      - name: T1 with every discoverable harness required
+        env:
+          HIVIZ_REQUIRE_HARNESSES: claude,codex,pi,opencode
+        run: python tests/run.py --t1
+
   t1:
     name: t1 (${{ matrix.os }}, py${{ matrix.python }}, node ${{ matrix.node }})
     strategy:

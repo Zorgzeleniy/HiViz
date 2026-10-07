@@ -7,7 +7,7 @@ import re
 import sys
 
 
-from .core import OUT, REPO, browser_export, check, sh
+from .core import OUT, REPO, browser_export, check, fresh_home, home_env, sh
 
 
 # Runs hvfmt against a fake kernel32/msvcrt, so the Windows branch is exercised on any OS.
@@ -187,3 +187,74 @@ def report_checks() -> None:
           and "\\| Excuse \\| Reality" in row("D16") and "⇄" in row("C1") and "## ⚪ Kept safe" in exp)
     check("report: browser export — decisions, batch skips decided rows, undecided stays empty, pipes escaped", ok,
           f"{len(exp.splitlines())} lines" if exp else "no preview")
+
+
+def json_checks() -> None:
+    """--format json: one parseable document on stdout for every engine, exit codes unchanged, ASCII-safe."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("GITHUB_", "HIVIZ_")) and k not in ("NO_COLOR", "FORCE_COLOR")}
+    py = sys.executable
+
+    def doc(cmd: list[str], **extra: str):
+        r = sh(cmd + ["--format", "json"], env={**env, **extra})
+        try:
+            return r.returncode, json.loads(r.stdout)
+        except ValueError:
+            return r.returncode, None
+
+    rc, d = doc([py, "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml", "--base", "tests/fixture"])
+    ok_drift = (rc == 1 and d and d["summary"]["STALE"] == 2 and len(d["rows"]) == 7 and d["needs_attention"] == 2
+                and {"id", "status", "detail"} <= set(d["rows"][0]))
+    fake = f'"{py}" tests/fake_harness.py "{{ask}}"'
+    (REPO / "tests/fake_harness.py").with_suffix(".state").unlink(missing_ok=True)
+    rc_c, c = doc([py, "constitution/run.py", "--tests", "tests/const_fixture", "--harness", fake, "--corpus", "tests/fixture/agent"])
+    ok_const = (rc_c == 1 and c and c["summary"]["PASS"] >= 3 and c["failed"] >= 1 and all("seconds" in r for r in c["rows"]))
+    fx = OUT / "blame_fx"
+    rc_b, b = doc([py, "blame/blame.py", "--file", "tests/fixture/agent/AGENTS.md", "--marker", "10.0.0.42",
+                   "--sessions", str(fx / "sessions"), "--ledger", str(fx / "meta/ledger.jsonl")])
+    ok_blame = (rc_b == 0 and b and b["marker"] == "10.0.0.42" and len(b["ledger"]) >= 1 and len(b["history"]) >= 1)
+    rc_m, m = doc([py, "meters/mcp_footprint.py", "--config", str(OUT / "mcp_rendered.json"),
+                   "--sessions", "tests/fixture/blame/sessions", "--out", str(OUT / "fake_mcp_json.json")])
+    ok_meters = (rc_m == 0 and m and any(r.get("tools") == 3 for r in m["rows"]))
+    rc_r, r = doc([py, "render/report.py", "--md", "tests/fixture/report.md", "--summary"])
+    ok_report = bool(rc_r == 0 and r and r["funnel"] and [len(x["rows"]) for x in r["sections"]] == [2, 9, 3]
+                     and r["corpus_bytes"] == 19377 and r["sections"][0]["rows"][1]["other"] == "")
+    check("json: drift, constitution, blame, meters, report each print ONE parseable document (exit codes unchanged)",
+          all([ok_drift, ok_const, ok_blame, ok_meters, ok_report]),
+          f"drift={bool(ok_drift)} constitution={bool(ok_const)} blame={bool(ok_blame)} meters={bool(ok_meters)} report={bool(ok_report)}")
+    oem = sh([py, "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml", "--base", "tests/fixture", "--format", "json"],
+             env={**env, "PYTHONIOENCODING": "cp866"})
+    check("json: output is ASCII-only, so it survives any stream encoding (cp866)",
+          oem.stdout.isascii() and json.loads(oem.stdout)["summary"]["OK"] == 4, (oem.stderr.strip().splitlines() or [""])[-1])
+
+
+def installer_output_checks() -> None:
+    """bin/hiviz.js: md (piped, unchanged) / pretty (symbols, table, color) / json (status only)."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("HIVIZ_") and k not in ("NO_COLOR", "FORCE_COLOR")}
+    home = fresh_home("installer-output")
+    for m in (".claude", ".codex"):
+        (home / m).mkdir(parents=True)
+    e = home_env(home, **{k: v for k, v in env.items() if k in ("PATH", "SYSTEMROOT")})
+    st = sh(["node", "bin/hiviz.js", "status", "--format", "json"], env=e)
+    try:
+        data = json.loads(st.stdout)
+    except ValueError:
+        data = {}
+    by = {h["harness"]: h for h in data.get("harnesses", [])}
+    check("installer: `status --format json` lists every harness with detected / adapter / plugin",
+          len(by) == 7 and by["Claude Code"]["detected"] and by["Codex"]["detected"] and not by["pi"]["detected"]
+          and by["Codex"]["adapter"].startswith("missing") and by["pi"]["adapter"] == "n/a", f"{len(by)} harnesses")
+    pe = {**e, "FORCE_COLOR": "1"}
+    pretty = sh(["node", "bin/hiviz.js", "status", "--format", "pretty"], env=pe)
+    dry = sh(["node", "bin/hiviz.js", "init", "--dry", "--format", "pretty"], env=pe)
+    plain = sh(["node", "bin/hiviz.js", "status"], env=e)
+    check("installer: pretty = box table + symbols + color; piped default stays the legacy text",
+          "╭" in pretty.stdout and "\x1b[" in pretty.stdout and "○" in dry.stdout and "would write" in dry.stdout
+          and "  ~ " not in dry.stdout and plain.stdout.startswith("Harnesses on this machine:") and "╭" not in plain.stdout, "")
+    nc = sh(["node", "bin/hiviz.js", "status", "--format", "pretty"], env={**pe, "NO_COLOR": "1"})
+    asc = sh(["node", "bin/hiviz.js", "init", "--dry", "--format", "pretty"], env={**e, "HIVIZ_ASCII": "1"})
+    asc_t = sh(["node", "bin/hiviz.js", "status", "--format", "pretty"], env={**e, "HIVIZ_ASCII": "1"})
+    check("installer: NO_COLOR drops color, HIVIZ_ASCII drops every non-ASCII glyph",
+          "\x1b" not in nc.stdout and "╭" in nc.stdout and asc.stdout.isascii() and asc_t.stdout.isascii() and "+---" in asc_t.stdout, "")
+    bad = sh(["node", "bin/hiviz.js", "init", "--format", "json"], env=e)
+    check("installer: --format json is refused for init (status only) with exit 2, nothing written",
+          bad.returncode == 2 and "status" in bad.stderr and not (home / ".agents").exists(), f"rc={bad.returncode}")

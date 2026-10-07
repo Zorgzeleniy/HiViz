@@ -44,6 +44,7 @@ def probe_hint() -> str:
 
 # ---------------------------------------------------------------- T2
 def profile_setup() -> None:
+    h = adapter()   # first: an unsupported HIVIZ_T2_HARNESS must not touch the sandbox
     if PROFILE.parent.exists():
         shutil.rmtree(PROFILE.parent)
     PROFILE.mkdir(parents=True)
@@ -62,7 +63,6 @@ def profile_setup() -> None:
         for d in sorted(vendor.iterdir()):
             if d.is_dir():
                 shutil.copytree(d, PROFILE / "skills" / f"{name}-{d.name}")
-    h = adapter()
     if h.skills_dir:   # harnesses other than omp read skills from a project-local dir
         apply_tpl = (REPO / "templates/skill-apply.md").read_text(encoding="utf-8")
         (PROFILE / "skills/hv-apply").mkdir(parents=True)

@@ -35,7 +35,7 @@ npx @zorgzeleniy/hiviz init
 
 Detects every supported agent on your machine, installs the commands and skills each one reads, and deploys the python engines to `~/.hiviz/engines`. Safe to re-run; `npx @zorgzeleniy/hiviz uninstall` removes only what it wrote (preview with `--dry`).
 
-**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all.
+**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. Every engine prints for humans on a terminal and plain markdown when piped; `--format json` gives one JSON document for scripts (`NO_COLOR`, `HIVIZ_ASCII=1` and `HIVIZ_FORMAT` are honored).
 
 **Or through your agent's own plugin manager** — same skills, engines bundled:
 

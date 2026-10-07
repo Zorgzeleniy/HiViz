@@ -247,6 +247,10 @@ def main() -> int:
     verified = verified_from(Path(a.constitution) if a.constitution else None, marker)
 
     loc = f"{target.name}:{a.line}" if a.line else target.name
+    if hvfmt.is_json():
+        print(hvfmt.dumps({"file": str(target), "line": a.line, "marker": marker, "ledger": ledger,
+                           "history": events, "verified": verified}))
+        return 0
     if hvfmt.is_pretty():
         return print_pretty(loc, marker, ledger, events, verified)
     print(f"## {loc}")

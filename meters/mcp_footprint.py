@@ -471,7 +471,10 @@ def main() -> int:
     rows.sort(key=lambda r: -(r.get("bytes") or 0))
 
     pretty = hvfmt.is_pretty()
-    if pretty:
+    if hvfmt.is_json():
+        print(hvfmt.dumps({"generated": time.strftime("%Y-%m-%dT%H:%M:%S"), "rows": rows}))
+        ok = sum("error" not in r for r in rows)
+    elif pretty:
         print(hvfmt.heading("mcp footprint", f"{len(rows)} servers"))
         top = max([r.get("tokens") or 0 for r in rows] + [1])
         body, errs = [], []
@@ -513,9 +516,10 @@ def main() -> int:
         tmp.write_text(json.dumps({"generated": time.strftime("%Y-%m-%dT%H:%M:%S"), "rows": rows},
                                   indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(out)  # atomic
-    print(f"\n{ok}/{len(rows)} servers measured · json: {args.out}" if not pretty else
-          hvfmt.style(f"  {ok}/{len(rows)} servers measured · json: {args.out}", "gray"),
-          file=sys.stderr)
+    if not hvfmt.is_json():
+        print(f"\n{ok}/{len(rows)} servers measured · json: {args.out}" if not pretty else
+              hvfmt.style(f"  {ok}/{len(rows)} servers measured · json: {args.out}", "gray"),
+              file=sys.stderr)
     return 0
 
 if __name__ == "__main__":

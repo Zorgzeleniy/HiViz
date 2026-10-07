@@ -4,6 +4,7 @@
 Two output modes:
   md      the legacy markdown tables — what agents and CI logs get (stdout is not a TTY)
   pretty  box-drawing tables, status symbols, color — for a human at a terminal
+  json    one JSON document on stdout, nothing else (diagnostics stay on stderr)
 Resolution: --format > $HIVIZ_FORMAT > pretty when stdout is a TTY, else md.
 Color only in pretty mode on a TTY; NO_COLOR turns it off, FORCE_COLOR forces it.
 Symbols fall back to ASCII when the stream encoding cannot carry them; HIVIZ_ASCII=1 forces that
@@ -12,6 +13,7 @@ Symbols fall back to ASCII when the stream encoding cannot carry them; HIVIZ_ASC
 from __future__ import annotations
 
 import atexit
+import json
 import os
 import re
 import shutil
@@ -22,7 +24,7 @@ import time
 import unicodedata
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
-_STATE = {"pretty": False, "color": False, "unicode": True, "ansi": False}
+_STATE = {"pretty": False, "color": False, "unicode": True, "ansi": False, "json": False}
 
 _CODES = {"bold": "1", "dim": "2", "red": "31", "green": "32", "yellow": "33",
           "cyan": "36", "gray": "90"}
@@ -45,8 +47,8 @@ _BOX_A = dict(tl="+", tr="+", bl="+", br="+", h="-", v="|", t="+", b="+", l="+",
 
 
 def add_format_arg(ap) -> None:
-    ap.add_argument("--format", choices=("auto", "pretty", "md"), default="auto",
-                    help="human output (pretty) or markdown for agents/CI (md); "
+    ap.add_argument("--format", choices=("auto", "pretty", "md", "json"), default="auto",
+                    help="human output (pretty), markdown for agents/CI (md) or one JSON document on stdout (json); "
                          "auto = pretty on a terminal, else md ($HIVIZ_FORMAT overrides auto)")
 
 
@@ -112,7 +114,8 @@ def configure(fmt: str | None = "auto", stream=None) -> bool:
     tty = _isatty(stream)
     if not fmt or fmt == "auto":
         fmt = os.environ.get("HIVIZ_FORMAT", "").strip().lower()
-    pretty = (fmt == "pretty") if fmt in ("pretty", "md") else tty
+    as_json = fmt == "json"
+    pretty = (fmt == "pretty") if fmt in ("pretty", "md", "json") else tty
     ansi = tty and os.environ.get("TERM") != "dumb" and _enable_vt(stream)
     color = False
     if pretty:
@@ -134,12 +137,21 @@ def configure(fmt: str | None = "auto", stream=None) -> bool:
             cur = getattr(sys, name)
             if not isinstance(cur, _Folded):
                 setattr(sys, name, _Folded(cur))
-    _STATE.update(pretty=pretty, color=color, unicode=uni, ansi=ansi)
+    _STATE.update(pretty=pretty, color=color, unicode=uni, ansi=ansi, json=as_json)
     return pretty
 
 
 def is_pretty() -> bool:
     return _STATE["pretty"]
+
+
+def is_json() -> bool:
+    return _STATE["json"]
+
+
+def dumps(obj) -> str:
+    """The --format json document: ASCII-only (valid on any stream encoding), one object, indented."""
+    return json.dumps(obj, indent=2, ensure_ascii=True, default=str)
 
 
 def style(text: str, *names: str) -> str:

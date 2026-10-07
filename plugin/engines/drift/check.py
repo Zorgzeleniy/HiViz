@@ -180,7 +180,10 @@ def main() -> int:
     order = {"STALE": 0, "ERROR": 1, "UNVERIFIABLE": 2, "OK": 3}
     rows.sort(key=lambda r: (order[r["status"]], r["id"]))
     bad = [r for r in rows if r["status"] in ("STALE", "ERROR")]
-    if hvfmt.is_pretty():
+    if hvfmt.is_json():
+        print(hvfmt.dumps({"summary": {s: sum(r["status"] == s for r in rows) for s in order},
+                           "needs_attention": len(bad), "active_checks": allowed, "rows": rows}))
+    elif hvfmt.is_pretty():
         print(hvfmt.heading("drift", f"{len(rows)} facts · {facts_path}"))
         print(hvfmt.table(["status", "fact", "detail"],
                           [[r["status"], r["id"], r["detail"]] for r in rows], status_col=0))

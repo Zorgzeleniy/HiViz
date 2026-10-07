@@ -260,6 +260,49 @@ function syncTree(src, dst, dry) {
   return { wrote, removed };
 }
 
+// ---- output: md (plain text — what pipes, CI and agents get) | pretty (symbols + color on a terminal) | json (status only).
+// Same switches as the python engines: --format, HIVIZ_FORMAT, NO_COLOR, FORCE_COLOR, HIVIZ_ASCII.
+function resolveFormat(argv, env, isTTY) {
+  const i = argv.indexOf("--format");
+  const eq = argv.find((a) => a.startsWith("--format="));
+  const flag = i >= 0 ? argv[i + 1] || "" : eq ? eq.slice(9) : "";
+  const v = (flag || env.HIVIZ_FORMAT || "").trim().toLowerCase();
+  return ["pretty", "md", "json"].includes(v) ? v : isTTY ? "pretty" : "md";
+}
+const FMT = resolveFormat(process.argv, process.env, Boolean(process.stdout.isTTY));
+const COLOR = FMT === "pretty" && !process.env.NO_COLOR &&
+  (Boolean(process.env.FORCE_COLOR) || (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
+// legacy Windows consoles lack the glyphs: Unicode there only in a modern terminal (untested on Windows)
+const UNICODE = !process.env.HIVIZ_ASCII &&
+  (process.platform !== "win32" || Boolean(process.env.WT_SESSION || process.env.TERM_PROGRAM || process.env.ConEmuANSI));
+const CODES = { bold: 1, dim: 2, red: 31, green: 32, yellow: 33, cyan: 36, gray: 90 };
+const paint = (text, ...names) => (COLOR && names.length ? names.map((n) => `\x1b[${CODES[n]}m`).join("") + text + "\x1b[0m" : text);
+const MARKS = { "+": ["✔", "+", "green"], "=": ["✔", "=", "gray"], "~": ["○", "~", "cyan"], "!": ["!", "!", "yellow"], "-": ["–", "-", "gray"] };
+const symbol = (key) => { const [u, a, c] = MARKS[key]; return paint(UNICODE ? u : a, c, "bold"); };
+
+function say(text) {
+  if (FMT !== "pretty") { console.log(text); return; }
+  for (const line of String(text).split("\n")) {
+    const m = /^(\s*)([+=~!-]) (.*)$/.exec(line);
+    if (!m) { console.log(/^Done\./.test(line) ? paint(line, "bold") : line); continue; }
+    const failed = m[2] === "!" && /FAILED/.test(m[3]);
+    console.log(`${m[1]}${failed ? paint(UNICODE ? "✘" : "x", "red", "bold") : symbol(m[2])} ${failed ? paint(m[3], "red") : m[3]}`);
+  }
+}
+
+function table(headers, rows) {
+  const w = headers.map((h, i) => Math.max([...h].length, ...rows.map((r) => [...r[i].text].length)));
+  const B = UNICODE ? { tl: "╭", tr: "╮", bl: "╰", br: "╯", h: "─", v: "│", t: "┬", b: "┴", l: "├", r: "┤", x: "┼" }
+    : { tl: "+", tr: "+", bl: "+", br: "+", h: "-", v: "|", t: "+", b: "+", l: "+", r: "+", x: "+" };
+  const rule = (l, m, r) => paint(l + w.map((n) => B.h.repeat(n + 2)).join(m) + r, "gray");
+  const v = paint(B.v, "gray");
+  const cell = (text, i, ...style) => paint(text, ...style) + " ".repeat(w[i] - [...text].length);
+  const out = [rule(B.tl, B.t, B.tr), v + headers.map((h, i) => ` ${cell(h, i, "bold")} `).join(v) + v, rule(B.l, B.x, B.r)];
+  for (const r of rows) out.push(v + r.map((c, i) => ` ${cell(c.text, i, ...(c.style || []))} `).join(v) + v);
+  out.push(rule(B.bl, B.b, B.br));
+  return out.join("\n");
+}
+
 function installEngines(dry) {
   let wrote = 0, removed = 0;
   for (const dir of ENGINE_DIRS) {
@@ -267,32 +310,55 @@ function installEngines(dry) {
     wrote += r.wrote; removed += r.removed;
   }
   const mark = wrote + removed === 0 ? "=" : dry ? "~" : "+";
-  console.log(`  ${mark} engines -> ~/.hiviz/engines (${wrote} file${wrote === 1 ? "" : "s"} changed, ${removed} removed)`);
+  say(`  ${mark} engines -> ~/.hiviz/engines (${wrote} file${wrote === 1 ? "" : "s"} changed, ${removed} removed)`);
 }
 
 const detected = () => harnesses().filter((h) => fs.existsSync(h.marker));
 
 function status() {
   const plugins = pluginInstalls();
-  console.log("Harnesses on this machine:");
-  for (const h of harnesses()) {
+  const legacy = legacyTargets().length + (legacyWindsurf() ? 1 : 0);
+  const rows = harnesses().map((h) => {
     const det = fs.existsSync(h.marker);
     const inst = h.targets.every(([p]) => fs.existsSync(p));
-    const plug = plugins[h.id] ? " · plugin INSTALLED" : "";
-    console.log(`  ${h.name.padEnd(12)} ${det ? "detected" : "not found"} · adapter ${!det ? "n/a" : inst ? "INSTALLED" : plug ? "not needed" : "missing (run: hiviz init)"}${plug}`);
+    const plug = Boolean(plugins[h.id]);
+    const adapter = !det ? "n/a" : inst ? "INSTALLED" : plug ? "not needed" : "missing (run: hiviz init)";
+    return { h, det, plug, adapter };
+  });
+  if (FMT === "json") {
+    console.log(JSON.stringify({
+      harnesses: rows.map((r) => ({ harness: r.h.name, id: r.h.id, detected: r.det, adapter: r.adapter, plugin: r.plug })),
+      legacyAdapters: legacy,
+    }, null, 2));
+    return;
   }
-  const legacy = legacyTargets().length + (legacyWindsurf() ? 1 : 0);
-  if (legacy) console.log(`  legacy adapters from an older hiviz: ${legacy} (run: hiviz init to migrate)`);
+  if (FMT === "pretty") {
+    say("");
+    console.log(paint("hiviz status", "bold") + paint("  harnesses on this machine", "gray"));
+    console.log(table(["harness", "detected", "adapter"], rows.map((r) => [
+      { text: r.h.name },
+      { text: r.det ? "detected" : "not found", style: [r.det ? "green" : "gray"] },
+      { text: r.adapter + (r.plug ? " · plugin INSTALLED" : ""),
+        style: [r.adapter === "INSTALLED" || r.adapter === "not needed" ? "green" : r.adapter === "n/a" ? "gray" : "yellow"] },
+    ])));
+    if (legacy) say(`  ! legacy adapters from an older hiviz: ${legacy} (run: hiviz init to migrate)`);
+    return;
+  }
+  say("Harnesses on this machine:");
+  for (const r of rows) {
+    say(`  ${r.h.name.padEnd(12)} ${r.det ? "detected" : "not found"} · adapter ${r.adapter}${r.plug ? " · plugin INSTALLED" : ""}`);
+  }
+  if (legacy) say(`  legacy adapters from an older hiviz: ${legacy} (run: hiviz init to migrate)`);
 }
 
 function install(dry) {
   const list = detected();
   const plugins = pluginInstalls();
-  if (!list.length) console.log("No supported harness detected — installing the python engines only.");
+  if (!list.length) say("No supported harness detected — installing the python engines only.");
   // Shared targets (~/.agents/skills) are written once, labeled with every harness that reads them.
   const plan = new Map();
   for (const h of list) {
-    if (plugins[h.id]) { console.log(`  = ${h.name}: hiviz already installed through its plugin manager — adapters not needed`); continue; }
+    if (plugins[h.id]) { say(`  = ${h.name}: hiviz already installed through its plugin manager — adapters not needed`); continue; }
     for (const [dest, content] of h.targets) {
       if (!plan.has(dest)) plan.set(dest, { content, names: [] });
       plan.get(dest).names.push(h.name);
@@ -300,30 +366,30 @@ function install(dry) {
   }
   const sharedReaders = list.filter((h) => plugins[h.id] && h.targets.some(([p]) => plan.has(p)));
   for (const h of sharedReaders) {
-    console.log(`  ! ${h.name} will list the hiviz skills twice (plugin + ~/.agents/skills, needed by other harnesses)`);
+    say(`  ! ${h.name} will list the hiviz skills twice (plugin + ~/.agents/skills, needed by other harnesses)`);
   }
   for (const [dest, { content, names }] of plan) {
     const label = names.join("/");
     if (fs.existsSync(dest) && fs.readFileSync(dest, "utf8") === content) {
-      console.log(`  = ${label}: up-to-date ${path.relative(HOME, dest)}`);
+      say(`  = ${label}: up-to-date ${path.relative(HOME, dest)}`);
       continue;
     }
     if (isLink(dest) || (path.basename(dest) === "SKILL.md" && isLink(path.dirname(dest)))) {
-      console.log(`  ! ${label}: kept ${path.relative(HOME, dest)} — a symlink managed by another tool`);
+      say(`  ! ${label}: kept ${path.relative(HOME, dest)} — a symlink managed by another tool`);
       continue;
     }
     if (fs.existsSync(dest) && !owned(dest)) {
-      console.log(`  ! ${label}: kept ${path.relative(HOME, dest)} — not written by hiviz, remove it to install`);
+      say(`  ! ${label}: kept ${path.relative(HOME, dest)} — not written by hiviz, remove it to install`);
       continue;
     }
-    if (dry) { console.log(`  ~ ${label}: would write ${path.relative(HOME, dest)}`); continue; }
+    if (dry) { say(`  ~ ${label}: would write ${path.relative(HOME, dest)}`); continue; }
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, content);
-    console.log(`  + ${label}: wrote ${path.relative(HOME, dest)}`);
+    say(`  + ${label}: wrote ${path.relative(HOME, dest)}`);
   }
-  removeLegacy(dry, console.log);
+  removeLegacy(dry, say);
   installEngines(dry);
-  if (!dry) console.log(
+  if (!dry) say(
     "\nDone. Commands (Claude Code / OpenCode): /hv-audit, /hv-apply, /hv-drift, /hv-test, /hv-blame, /hv-translate.\n" +
     "Skills (Codex / omp / pi / Cursor / Windsurf / OpenCode): hv-audit, hv-apply, hv-drift, hv-constitution, hv-blame, hv-translate —\n" +
     "invoke by name or just ask \"audit my prompt debt\" / \"check instruction drift\" / \"blame this line\".\n" +
@@ -337,26 +403,28 @@ function uninstall(dry) {
     for (const [dest] of h.targets) {
       if (seen.has(dest)) continue;
       seen.add(dest);
-      n += removeAdapter(dest, h.name, dry, console.log);
+      n += removeAdapter(dest, h.name, dry, say);
     }
   }
-  n += removeLegacy(dry, console.log);
-  n += removeEngineDir(ENGINES, "~/.hiviz", dry, console.log);
+  n += removeLegacy(dry, say);
+  n += removeEngineDir(ENGINES, "~/.hiviz", dry, say);
   for (const [id, how] of Object.entries(pluginInstalls())) {
     const h = harnesses().find((x) => x.id === id);
-    console.log(`  ! ${h.name}: hiviz is also installed as a plugin — remove it there: ${how}`);
+    say(`  ! ${h.name}: hiviz is also installed as a plugin — remove it there: ${how}`);
   }
-  if (!n && !failures) console.log("  nothing to remove");
-  if (failures) { console.log(`\n${failures} item(s) could not be removed — see FAILED above`); process.exitCode = 1; }
+  if (!n && !failures) say("  nothing to remove");
+  if (failures) { say(`\n${failures} item(s) could not be removed — see FAILED above`); process.exitCode = 1; }
 }
 
 module.exports = { ROOT, ENGINE_DIRS, OWNERSHIP_MARK, skillSet, commandSet, syncTree };
 
 if (require.main === module) {
-  const cmd = process.argv[2] || "status";
+  const args = process.argv.slice(2).filter((a, i, all) => !a.startsWith("-") && all[i - 1] !== "--format");
+  const cmd = args[0] || "status";
   const dry = process.argv.includes("--dry");
+  if (FMT === "json" && cmd !== "status") { console.error("hiviz: --format json is supported for `status` only"); process.exit(2); }
   if (cmd === "status") status();
   else if (cmd === "init") install(dry);
   else if (cmd === "uninstall") uninstall(dry);
-  else { console.log("usage: hiviz [status | init [--dry] | uninstall [--dry]]"); process.exit(2); }
+  else { console.log("usage: hiviz [status | init [--dry] | uninstall [--dry]] [--format pretty|md|json]"); process.exit(2); }
 }

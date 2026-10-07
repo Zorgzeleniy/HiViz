@@ -699,8 +699,23 @@ def summary_md(md: str, md_path: str = "", html_path: str = "", decisions_path: 
     return "\n".join(out)
 
 
+def summary_json(md: str, md_path: str = "", html_path: str = "", decisions_path: str = "") -> str:
+    """The whole report as one JSON document (every row, every section) for scripts and agents."""
+    rep = parse(md)
+    if rep is None:
+        return hvfmt.dumps({"funnel": False, "report": md_path})
+    return hvfmt.dumps({
+        "funnel": True, "title": rep.title, "executive": rep.exec_line, "corpus_bytes": rep.corpus,
+        "paths": {"report": md_path, "html": html_path, "decisions": decisions_path},
+        "sections": [{"key": s["key"], "title": s["title"], "rows": [
+            {"id": r.id, "verb": r.verb, "where": r.where, "other": r.other, "line": unwrap(r.line),
+             "category": r.cat, "reason": r.reason, "bytes": r.b} for r in s["rows"]]} for s in rep.sections]})
+
+
 def terminal(md: str, md_path: str = "", html_path: str = "", decisions_path: str = "", limit: int = 8) -> str:
     """Human summary for the console: counts, top actions, the rows to decide (by effect), paths."""
+    if hvfmt.is_json():
+        return summary_json(md, md_path, html_path, decisions_path)
     if not hvfmt.is_pretty():
         return summary_md(md, md_path, html_path, decisions_path, limit)
     rep = parse(md)
@@ -774,7 +789,7 @@ def main() -> int:
     if a.out:
         html = render(md, src.stem)
         Path(a.out).write_text(html, encoding="utf-8")
-        print(f"html view: {a.out} ({len(html):,} bytes)")
+        print(f"html view: {a.out} ({len(html):,} bytes)", file=sys.stderr if hvfmt.is_json() else sys.stdout)
     if a.summary:
         print(terminal(md, str(src), a.out or ""))
     return 0
