@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import run  # noqa: E402  (profile_setup lives in the rig)
+from rig import core, t2 as run  # noqa: E402  (profile_setup lives in the rig)
 
 run.profile_setup()
 
@@ -21,7 +21,7 @@ tpl = (REPO / "templates/skill.md").read_text(encoding="utf-8")
 body = (tpl.replace("{{AUDIT_BODY}}", (REPO / "core/AUDIT.md").read_text(encoding="utf-8"))
            .replace("{{APPLY_BODY}}", (REPO / "core/APPLY.md").read_text(encoding="utf-8")))
 (run.PROFILE / "skills/hv-audit/SKILL.md").write_text(body, encoding="utf-8")
-src = sqlite3.connect(str(run.HOME / ".omp/agent/agent.db"))
+src = sqlite3.connect(str(core.HOME / ".omp/agent/agent.db"))
 dst = sqlite3.connect(str(run.PROFILE / "agent.db"))
 with dst:
     src.backup(dst)
