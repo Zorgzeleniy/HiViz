@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 
@@ -60,6 +61,7 @@ def meters_discovery_check() -> None:
 
 
 def engine_checks() -> None:
+    drift_active_checks()
     mcp_cfg = OUT / "mcp_rendered.json"
     _mcp = json.loads((REPO / "tests/fixture/agent/mcp.json").read_text(encoding="utf-8"))
     _mcp["mcpServers"]["fake-bloated"]["command"] = sys.executable
@@ -204,3 +206,55 @@ def engine_checks() -> None:
           tr_ok, f"7 targets, claude CLAUDE({len(cl['CLAUDE.md'].splitlines())}L)" if tr_ok
           else (tr_err or "content mismatch")[-160:])
 
+
+
+def drift_active_checks() -> None:
+    """shell / port_open facts execute what facts.toml names: they must not run for fork PRs / pull_request_target."""
+    d = OUT / "drift_active"
+    shutil.rmtree(d, ignore_errors=True)
+    d.mkdir(parents=True)
+    (d / "touch.py").write_text("import pathlib\npathlib.Path('ran.txt').write_text('x')\n", encoding="utf-8")
+    exe = sys.executable.replace("\\", "/")
+    (d / "facts.toml").write_text(
+        f"[facts.shell-fact]\ndescription = 'runs a command'\ncheck = {{ type = 'shell', cmd = '\"{exe}\" touch.py' }}\n"
+        "[facts.port-fact]\ndescription = 'opens a socket'\ncheck = { type = 'port_open', host = '127.0.0.1', port = 9 }\n"
+        "[facts.file-fact]\ndescription = 'passive'\ncheck = { type = 'file_exists', path = 'touch.py' }\n", encoding="utf-8")
+
+    def run(mode: str | None = None, **ev: str) -> tuple[bool, dict]:
+        (d / "ran.txt").unlink(missing_ok=True)
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("GITHUB_", "HIVIZ_"))}
+        env.update(ev)
+        out = d / "out.json"
+        out.unlink(missing_ok=True)
+        cmd = [sys.executable, "drift/check.py", "--facts", str(d / "facts.toml"), "--base", str(d), "--out", str(out)]
+        sh(cmd + (["--active-checks", mode] if mode else []), env=env)
+        rows = {r["id"]: r for r in json.loads(out.read_text(encoding="utf-8"))} if out.exists() else {}
+        return (d / "ran.txt").exists(), rows
+
+    def payload(name: str, head_repo: dict | None) -> str:
+        f = d / f"{name}.json"
+        f.write_text(json.dumps({"pull_request": {"head": {"repo": head_repo}, "base": {"repo": {"full_name": "o/r"}}}}), encoding="utf-8")
+        return str(f)
+
+    ran, rows = run()
+    ok = ran and rows["shell-fact"]["status"] == "OK" and rows["port-fact"]["status"] in ("OK", "STALE")
+    check("drift: active checks run by default outside a pull request", ok, rows.get("shell-fact", {}).get("detail", ""))
+    cases = {
+        "--active-checks off": run("off"),
+        "pull_request_target": run(GITHUB_EVENT_NAME="pull_request_target"),
+        "pull_request from a fork": run(GITHUB_EVENT_NAME="pull_request",
+                                        GITHUB_EVENT_PATH=payload("fork", {"full_name": "x/r", "fork": True})),
+        "pull_request, head repo gone": run(GITHUB_EVENT_NAME="pull_request", GITHUB_EVENT_PATH=payload("gone", None)),
+        "pull_request, payload unreadable": run(GITHUB_EVENT_NAME="pull_request", GITHUB_EVENT_PATH=str(d / "missing.json")),
+        "invalid HIVIZ_ACTIVE_CHECKS": run(HIVIZ_ACTIVE_CHECKS="yes please"),
+    }
+    bad = [k for k, (ran_, r) in cases.items()
+           if ran_ or r.get("shell-fact", {}).get("status") != "UNVERIFIABLE" or r.get("port-fact", {}).get("status") != "UNVERIFIABLE"
+           or r.get("file-fact", {}).get("status") != "OK"]
+    check("drift: shell and port_open facts are NOT run for fork PRs, pull_request_target, unreadable or invalid input "
+          "(shown UNVERIFIABLE, passive facts still checked)", not bad, ", ".join(bad) or f"{len(cases)} scenarios")
+    same = run(GITHUB_EVENT_NAME="pull_request", GITHUB_EVENT_PATH=payload("same", {"full_name": "o/r", "fork": False}))
+    forced = run("on", GITHUB_EVENT_NAME="pull_request_target")
+    env_on = run(GITHUB_EVENT_NAME="pull_request_target", HIVIZ_ACTIVE_CHECKS="on")
+    check("drift: same-repo pull_request still runs them, and `on` (flag or env) overrides the guard",
+          same[0] and forced[0] and env_on[0], f"same={same[0]} on={forced[0]} env={env_on[0]}")

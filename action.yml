@@ -3,6 +3,10 @@ description: "Deterministic CI gate for standing agent instructions: facts-vs-en
 branding:
   icon: "check-circle"
   color: "orange"
+inputs:
+  active-checks:
+    description: "Run `shell` / `port_open` facts: auto (default) | on | off. auto skips them for fork pull requests and pull_request_target, where facts.toml comes from the PR."
+    default: "auto"
 runs:
   using: "composite"
   steps:
@@ -14,6 +18,7 @@ runs:
       # engines run straight from the action checkout — pinned to the ref the workflow uses, no npm
       env:
         HIVIZ_ENGINES: ${{ github.action_path }}
+        HIVIZ_ACTIVE_CHECKS: ${{ inputs.active-checks }}
       run: |
         if [ ! -f .hiviz/facts.toml ]; then
           echo "no .hiviz/facts.toml — run /hv-audit (or ask hiviz to ingest your facts) and commit it. Skipping."

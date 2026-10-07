@@ -286,7 +286,7 @@ After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift 
 - uses: Zorgzeleniy/hiviz@main
 ```
 
-That's the whole step: it runs the drift engine bundled in the action (no npm, no network) and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). MCP pay-vs-use rows appear when `.hiviz/mcp_footprint.json` is committed (the audit writes it). Constitution probes need an agent CLI and its credentials, so the action does not run them — add `python <hiviz>/constitution/run.py --harness <name>` as your own step if your CI has one.
+That's the whole step: it runs the drift engine bundled in the action (no npm, no network) and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). MCP pay-vs-use rows appear when `.hiviz/mcp_footprint.json` is committed (the audit writes it). `shell` and `port_open` facts run a command / open a socket named in `facts.toml`, so on a pull request from a fork — and under `pull_request_target`, where the file comes from the PR — they are **not run** (they show as `UNVERIFIABLE`, never as a silent pass). Set `with: { active-checks: "on" }` to force them, `"off"` to never run them; the same switch is `--active-checks` / `HIVIZ_ACTIVE_CHECKS` when you call `drift/check.py` yourself. Constitution probes need an agent CLI and its credentials, so the action does not run them — add `python <hiviz>/constitution/run.py --harness <name>` as your own step if your CI has one.
 
 ---
 

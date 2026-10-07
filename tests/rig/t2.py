@@ -4,11 +4,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
+import sys
 import time
 from pathlib import Path
 
 
+from .harness import HARNESSES, Harness
 from .core import GT, HOME, OUT, REPO, RESULTS, _SECTION, browser_export, check, hvfmt, sh
 
 
@@ -21,16 +24,22 @@ T2_HARNESS = os.environ.get("HIVIZ_T2_HARNESS", "omp")  # omp | opencode
 T2_MODEL = os.environ.get("HIVIZ_T2_MODEL", "opencode/big-pickle")  # opencode only
 
 
+def adapter() -> Harness:
+    h = HARNESSES.get(T2_HARNESS)
+    if h is None or h.argv is None:
+        wired = ", ".join(n for n, x in HARNESSES.items() if x.argv)
+        sys.exit(f"T2 model runs are wired for: {wired} (HIVIZ_T2_HARNESS={T2_HARNESS!r}). To add a harness give its entry "
+                 "in tests/rig/harness.py an argv — RUNBOOK, 'Adding a harness to T2'. Its skill discovery is already "
+                 "checked against the real CLI in T1, without a model.")
+    return h
+
+
 def agent_cmd(prompt: str) -> list[str]:
-    if T2_HARNESS == "opencode":
-        return ["opencode", "run", "-m", T2_MODEL, "--dir", str(PROFILE), "--auto", prompt]
-    return ["omp", "--profile", "hiviz-test", "-p", prompt]
+    return adapter().argv(prompt, PROFILE, T2_MODEL)
 
 
 def probe_hint() -> str:
-    if T2_HARNESS == "opencode":
-        return f'headless `opencode run -m {T2_MODEL} --dir {PROFILE.as_posix()} --auto "<ask>"`'
-    return 'headless `omp --profile hiviz-test -p "<ask>"`'
+    return "headless `" + shlex.join(adapter().argv("<ask>", PROFILE, T2_MODEL)) + "`"
 
 
 # ---------------------------------------------------------------- T2
@@ -53,16 +62,18 @@ def profile_setup() -> None:
         for d in sorted(vendor.iterdir()):
             if d.is_dir():
                 shutil.copytree(d, PROFILE / "skills" / f"{name}-{d.name}")
-    if T2_HARNESS == "opencode":
+    h = adapter()
+    if h.skills_dir:   # harnesses other than omp read skills from a project-local dir
         apply_tpl = (REPO / "templates/skill-apply.md").read_text(encoding="utf-8")
         (PROFILE / "skills/hv-apply").mkdir(parents=True)
         (PROFILE / "skills/hv-apply/SKILL.md").write_text(
             apply_tpl.replace("{{APPLY_BODY}}", (REPO / "core/APPLY.md").read_text(encoding="utf-8")),
             encoding="utf-8")
-        # omp loads RULES.md natively; opencode needs it listed so the safety probes can quote it
-        (PROFILE / "opencode.json").write_text('{"instructions": ["RULES.md"]}\n', encoding="utf-8")
-        (PROFILE / ".agents").mkdir()
-        (PROFILE / ".agents/skills").symlink_to("../skills", target_is_directory=True)
+        link = PROFILE / h.skills_dir
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(os.path.relpath(PROFILE / "skills", link.parent), target_is_directory=True)
+        for rel, text in h.extras.items():   # e.g. opencode must be told to load RULES.md so the safety probes can quote it
+            (PROFILE / rel).write_text(text, encoding="utf-8")
     (PROFILE / "config.yml").write_text(
         "modelRoles:\n  default: zai/glm-5.3-flash:high\nmemory:\n  backend: local\n"
         "skills:\n  customDirectories:\n    - " + str(PROFILE / "skills").replace("\\", "/") + "\n",

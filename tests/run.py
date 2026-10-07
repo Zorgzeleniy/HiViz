@@ -12,10 +12,12 @@ Usage: python tests/run.py [--t1|--t2|--t2x|--all]   (default: --t1)
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 
 from rig.core import OUT, _SECTION, hvfmt, summary
+from rig.discovery import discovery_checks
 from rig.engines import engine_checks
 from rig.installer import installer_checks, plugin_checks, plugin_install_checks, uninstall_checks, uninstall_edge_checks
 from rig.output import format_checks, report_checks
@@ -35,10 +37,13 @@ def t1() -> None:
     format_checks()
     report_checks()
     plugin_checks()
+    discovery_checks()
 
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+    for var in ("GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "HIVIZ_ACTIVE_CHECKS"):
+        os.environ.pop(var, None)   # hermetic: CI's own event must not steer the engines under test
     ap = argparse.ArgumentParser()
     ap.add_argument("--t1", action="store_true")
     ap.add_argument("--t2", action="store_true")

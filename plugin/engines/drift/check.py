@@ -6,12 +6,16 @@ checker against the live machine, prints a status table, writes JSON, exits
 non-zero when anything is STALE/ERROR. No LLM, no network, stdlib only.
 
 Statuses: OK (check passes) · STALE (check fails — fact no longer true)
-· UNVERIFIABLE (no check defined) · ERROR (checker itself broke).
+· UNVERIFIABLE (no check defined, or an active check that was not allowed to run) · ERROR (checker itself broke).
+
+`shell` and `port_open` facts execute a command / open a socket named in facts.toml. In CI that file may come from a
+pull request, so --active-checks auto (default) skips them for fork PRs and pull_request_target — see README, "Run it in CI".
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import socket
 import subprocess
@@ -26,11 +30,41 @@ import hvfmt  # noqa: E402
 
 
 
-def run_check(check: dict, base: Path) -> tuple[str, str]:
+ACTIVE_TYPES = ("shell", "port_open")   # run a command / open a socket named by facts.toml
+
+
+def active_checks_allowed(mode: str, env=None) -> tuple[bool, str]:
+    """Whether shell / port_open facts may run. auto: refuse when the facts file can come from an untrusted
+    pull request (GitHub: pull_request_target, or a pull_request from a fork); anywhere else it is on.
+    Unknown or unreadable event data fails closed."""
+    env = os.environ if env is None else env
+    if mode not in ("auto", "on", "off"):
+        return False, f"invalid active-checks value {mode!r}"
+    if mode == "on":
+        return True, ""
+    if mode == "off":
+        return False, "--active-checks off"
+    event = env.get("GITHUB_EVENT_NAME", "")
+    if event == "pull_request_target":
+        return False, "pull_request_target: the facts file may come from the PR"
+    if event == "pull_request":
+        try:
+            pr = json.loads(Path(env["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))["pull_request"]
+            head, base = pr["head"]["repo"] or {}, pr["base"]["repo"]
+        except (KeyError, OSError, ValueError, TypeError):
+            return False, "pull_request: event payload unreadable"
+        if head.get("fork") or head.get("full_name") != base.get("full_name"):
+            return False, "pull request from a fork"
+    return True, ""
+
+
+def run_check(check: dict, base: Path, skip_active: str = "") -> tuple[str, str]:
     t = check.get("type")
     try:
         if t is None:
             return "UNVERIFIABLE", "no check defined"
+        if skip_active and t in ACTIVE_TYPES:
+            return "UNVERIFIABLE", f"{t} check not run ({skip_active})"
         if t == "file_exists":
             p = base / check["path"]
             return ("OK", str(p)) if p.exists() else ("STALE", f"missing: {p}")
@@ -117,6 +151,9 @@ def main() -> int:
     ap.add_argument("--mcp-min-tokens", type=int, default=500)
     ap.add_argument("--mcp-stale-days", type=int, default=30)
     ap.add_argument("--out", default=None, help="optional JSON output path")
+    ap.add_argument("--active-checks", choices=("auto", "on", "off"), default=os.environ.get("HIVIZ_ACTIVE_CHECKS", "auto"),
+                    help="run `shell` and `port_open` facts (they execute commands / open sockets named in facts.toml). "
+                         "auto = on, except when GitHub says the facts file may come from a fork PR or pull_request_target")
     hvfmt.add_format_arg(ap)
     a = ap.parse_args()
     hvfmt.configure(a.format)
@@ -130,9 +167,10 @@ def main() -> int:
     data = tomllib.loads(facts_path.read_text(encoding="utf-8"))
     registry = data.get("facts", {})
 
+    allowed, why = active_checks_allowed(a.active_checks)
     rows = []
     for fid, spec in registry.items():
-        status, detail = run_check(spec.get("check") or {}, base)
+        status, detail = run_check(spec.get("check") or {}, base, "" if allowed else why)
         rows.append({"id": fid, "status": status, "detail": detail,
                      "description": spec.get("description", "")})
     fp = Path(a.mcp_footprint) if a.mcp_footprint else base / ".hiviz" / "mcp_footprint.json"
