@@ -38,6 +38,7 @@ STATUS = {
     "UNVERIFIABLE": ("○", "?", "yellow"), "ORPHANED": ("○", "?", "yellow"),
     "SKIP": ("–", "-", "gray"),
     "REVIEW": ("✎", "~", "yellow"),
+    "UNPROVEN": ("○", "?", "yellow"),
     # audit-report verbs (→ verb column)
     "delete": ("✘", "x", "red"), "disable": ("⊘", "x", "red"),
     "rewrite": ("✎", "~", "yellow"), "merge": ("⇄", "=", "cyan"),

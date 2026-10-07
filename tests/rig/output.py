@@ -206,7 +206,7 @@ def json_checks() -> None:
                 and {"id", "status", "detail"} <= set(d["rows"][0]))
     fake = f'"{py}" tests/fake_harness.py "{{ask}}"'
     (REPO / "tests/fake_harness.py").with_suffix(".state").unlink(missing_ok=True)
-    rc_c, c = doc([py, "constitution/run.py", "--tests", "tests/const_fixture", "--harness", fake, "--corpus", "tests/fixture/agent"])
+    rc_c, c = doc([py, "constitution/run.py", "--tests", "tests/const_fixture", "--harness", fake, "--corpus", "tests/fixture/agent", "--control", "off"])
     ok_const = (rc_c == 1 and c and c["summary"]["PASS"] >= 3 and c["failed"] >= 1 and all("seconds" in r for r in c["rows"]))
     fx = OUT / "blame_fx"
     rc_b, b = doc([py, "blame/blame.py", "--file", "tests/fixture/agent/AGENTS.md", "--marker", "10.0.0.42",

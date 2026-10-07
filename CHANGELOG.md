@@ -17,6 +17,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver;
   `render/report.py --summary` prints the same view for a terminal.
 - **`drift --active-checks auto|on|off`** (`HIVIZ_ACTIVE_CHECKS`, Action input `active-checks`).
 - Clear “needs Python >= 3.11” message instead of a `tomllib` traceback on older interpreters.
+- **A probe PASS has to be earned (negative control).** After a PASS, `constitution/run.py` asks the same question in a copy of
+  `--corpus` — instruction-like files only, no `.git` / `.hiviz` / backups — **without the rule's line** (or in an empty
+  project when the test names no line), 3 samples in parallel. If any sample meets the markers too, the verdict is the new
+  **`UNPROVEN`** (the answer is quoted; a refusal that repeats the marker, like “I have no directives about git stash”, is
+  called out) instead of a PASS that proved nothing. A canary planted in the copied file checks that the harness really
+  reads it from its working directory; if not (a profile / config dir), the PASS stays with `control skipped: <reason>`.
+  `--control off`, `--control-runs N`, `--allow-tools`, `--strict` (UNPROVEN fails), `{cwd}` in `--harness` templates.
+  Measured on OpenCode, 189 runs in git projects: with the rule in AGENTS.md the probe passed 53 of 54 times, without it
+  generic markers still passed (`git stash` 6 of 6, library `destructive-gate` 6 of 6) — and the questions asked WITHOUT the
+  no-tools note went grepping the disk in 10 of 54 control runs, with it in 0 of 108.
 - **`apply/verify.py` — a deterministic check that apply changed only what was approved** (no model). New step 6 of the
   apply procedure: rows decided no / keep / empty and every kept-safe line unchanged, `yes` rows applied, no other line
   removed, changed or added, a backup for every edited file and none for a file no decision names, a ledger entry per
@@ -24,6 +34,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver;
   It replaces trust in the model's word with a diff.
 
 ### Changed
+- **`hv-apply` runs its probes through the constitution engine** (steps 1 and 4): tests in `.hiviz/tests/`, verdicts
+  PASS / UNPROVEN / FAIL in `.hiviz/probes-before.json` / `probes-after.json` — the model no longer hand-runs a harness and
+  judges the answer. About 4 model calls per probed rule. Library tests are generic (most come back UNPROVEN on a real
+  harness until you narrow `guards` and the markers); with `--corpus` given, a PASS now costs the control's calls too
+  (`--control off` restores the old behavior).
+- Probes start the harness with `$PWD` set to its directory: Bun / Node harnesses (OpenCode) take their working directory
+  from `$PWD`, so `subprocess(cwd=…)` alone ran the probe in the caller's directory.
 - **Audit report rows have six columns** — `| id | where | line | why | B | → verb |`: `where` is the absolute
   `path:line` (a conflict names both sides, `A ⇄ B`), `B` the bytes the verb touches, `why` starts with a category from
   a closed set. `core/AUDIT.md` carries the contract; `core/APPLY.md` now says how `DECISION` values are read.

@@ -118,7 +118,7 @@ def engine_checks() -> None:
     (REPO / "tests/fake_harness.py").with_suffix(".state").unlink(missing_ok=True)
     c = sh([sys.executable, "constitution/run.py", "--tests", "tests/const_fixture",
            "--harness", fake_harness,
-           "--corpus", "tests/fixture", "--out", "tests/out/constitution.json"])
+           "--corpus", "tests/fixture", "--control", "off", "--out", "tests/out/constitution.json"])
     c_ok = c.returncode == 1
     cdetail = (c.stderr or "")[-140:]
     if c_ok:
@@ -133,7 +133,7 @@ def engine_checks() -> None:
     for f in ("PWNED", "PWNED2"):
         (OUT / f).unlink(missing_ok=True)
     c2 = sh([sys.executable, "constitution/run.py", "--tests", "tests/const_fixture_edge",
-             "--harness", fake_harness, "--corpus", "tests/fixture", "--out", "tests/out/constitution_edge.json"])
+             "--harness", fake_harness, "--corpus", "tests/fixture", "--control", "off", "--out", "tests/out/constitution_edge.json"])
     v2 = {}
     if (OUT / "constitution_edge.json").exists():
         v2 = {r["id"]: r["verdict"] for r in json.loads((OUT / "constitution_edge.json").read_text(encoding="utf-8"))}

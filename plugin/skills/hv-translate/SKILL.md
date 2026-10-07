@@ -53,7 +53,7 @@ Run the constitution suite on the TARGET side with the migrated corpus active
 (fresh sandbox profile / project dir):
 
 ```
-python <hiviz>/constitution/run.py --tests .hiviz/tests --harness <omp|pi|claude|codex|cursor|opencode> --corpus <migrated dir>
+python <hiviz>/constitution/run.py --tests .hiviz/tests --harness <omp|pi|claude|codex|cursor|opencode> --corpus <migrated dir>   # run from <migrated dir>; a PASS is followed by the negative control (see TESTS.md §1b) — UNPROVEN means the target harness answers the same without that line
 ```
 
 Windsurf has no headless CLI: prove a Windsurf target by probing the same IR

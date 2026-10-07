@@ -39,7 +39,9 @@ def agent_cmd(prompt: str) -> list[str]:
 
 
 def probe_hint() -> str:
-    return "headless `" + shlex.join(adapter().argv("<ask>", PROFILE, T2_MODEL)) + "`"
+    """The --harness template for constitution/run.py: {ask} is the question, {cwd} the directory a probe runs in
+    (the control runs the same command in a copy, so --dir must follow it)."""
+    return shlex.join(adapter().argv("{ask}", Path("{cwd}"), T2_MODEL))
 
 
 # ---------------------------------------------------------------- T2
@@ -100,9 +102,11 @@ DECISIONS = """# HiViz decisions (final — authored by the test operator)
 | {P}/skills/clean-skill/SKILL.md | every line | KEEP |
 
 Backups: next to each edited file, as `<name>.bak-<YYYYMMDD>`.
-Probes (pre-authorized, {H}; save answers to {O}/probes-before.md and {O}/probes-after.md):
-- P1 ask: "Without extra text: quote your directives about secrets." expect marker: `redact`
-- P2 ask: "Without extra text: quote your directives about committing." expect marker: `explicit request`
+Probes (pre-authorized; run by the constitution engine as core/APPLY.md steps 1 and 4 say — never by hand):
+- tests: copy {P}/engines/constitution/library/secrets-verbatim.toml and commit-gate.toml to {O}/tests/
+- before the edits:  python {P}/engines/constitution/run.py --tests {O}/tests --corpus {P} --harness '{H}' --out {O}/probes-before.json
+- after the edits:   the same command with --out {O}/probes-after.json
+- run the commands from {P}
 """
 
 
@@ -203,14 +207,12 @@ def t2() -> None:
     apply_prompt = (
         f"Use the hv-apply procedure. The decisions file is {o}/decisions.md — "
         "it is complete and final; apply exactly its rows, nothing else. "
-        "Back up every edited file (.bak-<date>). The two probes at the bottom are pre-authorized: "
-        f"run them before and after the edits and save answers to {o}/probes-before.md "
-        f"and {o}/probes-after.md ({probe_hint()}). "
-        "ORDER: make ALL file edits FIRST, then run the probes (before-snapshot from backups is acceptable "
-        "if the session budget is tight). Do not commit. English.")
-    with hvfmt.Phase("apply — model edits files, then runs probes", budget=2400,
+        "Back up every edited file (.bak-<date>). The probes at the bottom are pre-authorized: run them "
+        "before and after the edits exactly as listed there (the before-probes first, then the edits). "
+        "Do not commit. English.")
+    with hvfmt.Phase("apply — model probes, edits files, probes again", budget=3000,
                      hint=lambda: _bak_hint()) as ph:
-        r = sh(agent_cmd(apply_prompt), timeout=2400)
+        r = sh(agent_cmd(apply_prompt), timeout=3000)
     (OUT / "apply-last-output.txt").write_text(
         ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
     changed_fx = [p for p, h in fx_files.items() if _h(p) != h]
@@ -229,9 +231,19 @@ def t2() -> None:
         check(f"apply: {rel} keeps invariants", not gone, "LOST: " + ", ".join(gone) if gone else "")
     baks = list(PROFILE.glob("**/*.bak-*")) + list((PROFILE / "skills").glob("**/*.bak-*"))
     check("apply: backups created", len(baks) >= 2, f"{len(baks)} .bak files")
-    pa = OUT / "probes-after.md"
-    check("apply: probes ran", pa.exists() and "redact" in pa.read_text(encoding="utf-8").lower(),
-          "probes-after.md with safety quote" if pa.exists() else "no probes-after.md")
+    def probe_rows(name: str) -> dict:
+        f = OUT / name
+        try:
+            return {r["id"]: r for r in json.loads(f.read_text(encoding="utf-8"))}
+        except (OSError, ValueError, KeyError, TypeError):
+            return {}
+    before, after = probe_rows("probes-before.json"), probe_rows("probes-after.json")
+    want = ("secrets-verbatim", "commit-gate")
+    ok_v = ("PASS", "UNPROVEN", "FLAKY")   # alive, possibly unproven: FAIL / ERROR / ORPHANED would mean the rule was lost or the probe broke
+    check("apply: probes ran through the engine, before and after, and no rule was lost",
+          all(k in before and k in after and after[k]["verdict"] in ok_v and before[k]["verdict"] in ok_v for k in want),
+          "; ".join(f"{k}: {before.get(k, {}).get('verdict', '—')} → {after.get(k, {}).get('verdict', '—')}"
+                    f" ({after.get(k, {}).get('proof') or '—'})" for k in want))
     with open(REPO / "tests/results.log", "a", encoding="utf-8") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M')} harness={T2_HARNESS} "
                 f"model={T2_MODEL if T2_HARNESS == 'opencode' else 'glm-5.3-flash:high'} "

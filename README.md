@@ -52,9 +52,9 @@ Cursor, Windsurf and OpenCode: use `npx`. Where each harness gets what, env over
 
 1. **Run the audit.** `/hv-audit` (Claude Code, OpenCode), the `hv-audit` skill (Codex, omp, pi, Cursor, Windsurf) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule — conflicts flagged, a recommendation for each.
 2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / keep — or open `.hiviz/report.html`, which lists every row with its file, size and reason, batches decisions by category, and exports the same `decisions.md` (save it as `.hiviz/decisions.md`). HiViz never decides for you — nothing is pre-filled, and analysis and action are separate sessions, on purpose.
-3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule (a probe that fails restores the line from backup), then a deterministic check — `apply/verify.py`, no model — that only what you approved changed: rows you decided *no* or left empty and every safety line untouched, nothing else removed, changed or added, every edited file backed up, every decision in the ledger. Rewrites and conditional edits are listed for you to read.
+3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each rule the edits could silence (run by the constitution engine, each with a negative control; a rule lost restores its line from backup), then a deterministic check — `apply/verify.py`, no model — that only what you approved changed: rows you decided *no* or left empty and every safety line untouched, nothing else removed, changed or added, every edited file backed up, every decision in the ledger. Rewrites and conditional edits are listed for you to read.
 4. **Check drift.** `/hv-drift` diffs your facts registry against the live machine — milliseconds, no LLM.
-5. **Test your constitution.** `/hv-test` runs probe tests for your load-bearing rules. Run it before merging changes to instruction files — a FAIL means the change broke a rule's binding. Probes need an agent CLI, so they run locally or in a CI job that has one (the bundled GitHub Action runs drift only).
+5. **Test your constitution.** `/hv-test` runs probe tests for your load-bearing rules. Run it before merging changes to instruction files — a FAIL means the change broke a rule's binding, `UNPROVEN` that the probe could not tell (read the answer it quotes). Probes need an agent CLI, so they run locally or in a CI job that has one (the bundled GitHub Action runs drift only).
 
 ---
 
@@ -147,7 +147,7 @@ Every golden rule, every safety gate, every working command, the TypeSpec and wa
 
 </details>
 
-> **What's a probe?** The whole proof mechanism, in three sentences. HiViz opens a brand-new agent session in the background — no chat, just a question — and asks it to quote a rule ("what are your directives about secrets?"). If the fresh session still quotes the rule, the rule is alive, no matter which file it lives in. That's a probe; every "alive" above is one.
+> **What's a probe?** The whole proof mechanism, in three sentences. HiViz opens a brand-new agent session in the background — no chat, just a question — and asks it to quote a rule ("what are your directives about secrets?"). If the fresh session still quotes the rule, the rule is alive, no matter which file it lives in. Then comes the control: the same question in a copy of the project without that line — if the session says it anyway, the probe proved nothing and is marked `UNPROVEN` instead of "alive". That's a probe; every "alive" above is one.
 
 This very file then ran as the corpus arm in the field [A/B benchmark](#-the-numbers): the cleaned arm cost −13% to −29% on three of four tasks (tx-kv, hardening, bug-hunt) with no quality drop; on the fourth (real-jwt, a from-scratch implementation) the raw median was +43%, but one 4×-bloated run dominates n=3 — trimmed, it is flat (+3%).
 
@@ -183,20 +183,26 @@ Shown as printed on a terminal — values are illustrative, the layout is the en
 
 Fourteen tools, 1,430 tokens, every single session, zero invocations ever. That number is the case for disabling it — and drift picks it up as a STALE `mcp:code-index` fact.
 
-**Constitution tests** — rules that exist in the file but stopped *binding* the model:
+**Constitution tests** — rules that exist in the file but stopped *binding* the model. A PASS has to be earned: the same question is asked again in a copy of your project *without that rule's line*, and if the fresh session answers just as well, the verdict is `UNPROVEN` — the probe cannot show the rule binds (the harness says it anyway, another file says it, or the marker is a word any refusal repeats):
 
 ```
-╭─────────┬──────────────────┬───────────────────────────────────────┬───────┬───────────────────────────────────────╮
-│ verdict │ test             │ guards                                │ time  │ detail                                │
-├─────────┼──────────────────┼───────────────────────────────────────┼───────┼───────────────────────────────────────┤
-│ ◐ FLAKY │ language-default │ RULES.md: default answer language     │ 14.8s │ first attempt: none of                │
-│         │                  │                                       │       │ must_include_any matched              │
-│ ✔ PASS  │ commit-gate      │ RULES.md / CLAUDE.md: commit/push     │  7.1s │                                       │
-│         │                  │ gate (`explicit request`)             │       │                                       │
-│ ✔ PASS  │ secrets-verbatim │ RULES.md / CLAUDE.md: secrets         │  6.4s │                                       │
-│         │                  │ redaction line (`redact`)             │       │                                       │
-╰─────────┴──────────────────┴───────────────────────────────────────┴───────┴───────────────────────────────────────╯
-◐ 1 flaky   ✔ 2 pass
+╭────────────┬──────────────────┬─────────────────────────────────────┬───────┬──────────────────────────────────────╮
+│ verdict    │ test             │ guards                              │ time  │ detail                               │
+├────────────┼──────────────────┼─────────────────────────────────────┼───────┼──────────────────────────────────────┤
+│ ✔ PASS     │ secrets-verbatim │ RULES.md / CLAUDE.md: secrets       │ 33.5s │ proven: absent without the line      │
+│            │                  │ redaction line (`redact`)           │       │                                      │
+│ ✔ PASS     │ gateway          │ AGENTS.md: `10.0.0.42`              │ 30.0s │ proven: absent without the line      │
+│ ✔ PASS     │ language-default │ RULES.md: default answer language   │ 50.0s │ proven against an empty project only │
+│ ○ UNPROVEN │ stash            │ AGENTS.md: `git stash`              │ 28.7s │ the same question without the line   │
+│            │                  │                                     │       │ in AGENTS.md also met the markers:   │
+│            │                  │                                     │       │ “I have no directives about git      │
+│            │                  │                                     │       │ stash in my standing instructions.”  │
+│            │                  │                                     │       │ — this probe does not show the rule  │
+│            │                  │                                     │       │ binds (the answer is a refusal that  │
+│            │                  │                                     │       │ repeats your marker — use words only │
+│            │                  │                                     │       │ the rule itself contains)            │
+╰────────────┴──────────────────┴─────────────────────────────────────┴───────┴──────────────────────────────────────╯
+○ 1 unproven   ✔ 3 pass
 ```
 
 ---
@@ -230,7 +236,7 @@ Claude Code and OpenCode get them as slash commands; Codex, omp, pi, Cursor and 
 
 ### Where things live
 
-In your project, `.hiviz/`: `report.md` + `decisions.md` (audit), `probes-*.md` (apply proof), `ledger.jsonl` (change log), `facts.toml` (drift checklist), `tests/*.toml` (constitution), `mcp_footprint.json` (meters) — plus the reports each engine emits (`drift-report.md`, `constitution.json`, `report.html`, `ir.jsonl` — the intermediate format), all in the same place. On your machine: npm installs put commands in each agent's config dir, shared skills in `~/.agents/skills` and engines in `~/.hiviz/engines`; plugin installs live in the harness's own plugin cache. Apply leaves `<file>.bak-<date>` next to every file it edits. Nothing lands anywhere else.
+In your project, `.hiviz/`: `report.md` + `decisions.md` (audit), `probes-before.json` / `probes-after.json` (apply proof), `ledger.jsonl` (change log), `facts.toml` (drift checklist), `tests/*.toml` (constitution), `mcp_footprint.json` (meters) — plus the reports each engine emits (`drift-report.md`, `constitution.json`, `report.html`, `ir.jsonl` — the intermediate format), all in the same place. On your machine: npm installs put commands in each agent's config dir, shared skills in `~/.agents/skills` and engines in `~/.hiviz/engines`; plugin installs live in the harness's own plugin cache. Apply leaves `<file>.bak-<date>` next to every file it edits. Nothing lands anywhere else.
 
 ---
 
@@ -301,7 +307,7 @@ After an audit leaves `.hiviz/facts.toml` in your repo, the deterministic drift 
 - uses: Zorgzeleniy/hiviz@main
 ```
 
-That's the whole step: it runs the drift engine bundled in the action (no npm, no network) and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). MCP pay-vs-use rows appear when `.hiviz/mcp_footprint.json` is committed (the audit writes it). `shell` and `port_open` facts run a command / open a socket named in `facts.toml`, so on a pull request from a fork — and under `pull_request_target`, where the file comes from the PR — they are **not run** (they show as `UNVERIFIABLE`, never as a silent pass). Set `with: { active-checks: "on" }` to force them, `"off"` to never run them; the same switch is `--active-checks` / `HIVIZ_ACTIVE_CHECKS` when you call `drift/check.py` yourself. Constitution probes need an agent CLI and its credentials, so the action does not run them — add `python <hiviz>/constitution/run.py --harness <name>` as your own step if your CI has one.
+That's the whole step: it runs the drift engine bundled in the action (no npm, no network) and fails the build when a standing fact goes STALE (path moved, command gone, MCP server unused for 30 days). MCP pay-vs-use rows appear when `.hiviz/mcp_footprint.json` is committed (the audit writes it). `shell` and `port_open` facts run a command / open a socket named in `facts.toml`, so on a pull request from a fork — and under `pull_request_target`, where the file comes from the PR — they are **not run** (they show as `UNVERIFIABLE`, never as a silent pass). Set `with: { active-checks: "on" }` to force them, `"off"` to never run them; the same switch is `--active-checks` / `HIVIZ_ACTIVE_CHECKS` when you call `drift/check.py` yourself. Constitution probes need an agent CLI and its credentials, so the action does not run them — add `python <hiviz>/constitution/run.py --harness <name> --corpus .` as your own step if your CI has one (each PASS also runs the negative control — 3 more model calls per test, `--control off` skips it, `--strict` makes `UNPROVEN` fail the step).
 
 ---
 
@@ -313,7 +319,7 @@ The five invariants are the product. Breaking any of them is a semver-major deci
 2. **Never deletes safety lines.** Secrets, access, prod, commit/push gates are marked invariants — dedup/move only.
 3. **Never edits without a `.bak-<date>` backup** next to the file.
 4. **Never adds anything of its own.** Apply performs exactly the approved decisions, word for word — and `apply/verify.py` checks it afterwards, line by line.
-5. **Never claims a rule survived without a probe.** Verification = a fresh headless session quoting the rule.
+5. **Never claims a rule survived without a probe.** Verification = a fresh headless session quoting the rule — and a copy of the project without that line must not make the same session say it just as well, or the answer is `UNPROVEN`, not "alive".
 
 ---
 
