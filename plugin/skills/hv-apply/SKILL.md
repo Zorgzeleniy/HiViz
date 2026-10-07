@@ -1,6 +1,6 @@
 ---
 name: hv-apply
-description: "Apply human-approved hiviz decisions (.hiviz/decisions.md) to standing instruction files: before/after probes, .bak backups, exactly the approved edits, ledger entries. Use ONLY when the user explicitly asks to apply hiviz decisions — never on your own after an audit."
+description: "Apply human-approved hiviz decisions (.hiviz/decisions.md) to standing instruction files: before/after probes, .bak backups, exactly the approved edits, ledger entries, a deterministic check that nothing else changed. Use ONLY when the user explicitly asks to apply hiviz decisions — never on your own after an audit."
 ---
 
 # HiViz Apply Procedure
@@ -12,6 +12,7 @@ description: "Apply human-approved hiviz decisions (.hiviz/decisions.md) to stan
 4. **After-probes**: the same questions, fresh sessions. Compare: rule alive (its source may have moved — that is fine if the rule survives in the remaining location) / rule lost → restore that line from the backup.
 5. **Ledger**: append ONE line per approved decision to `.hiviz/ledger.jsonl`:
    `{"file": "<abs path>", "marker": "<line fragment>", "written_at": "<iso>", "model": "<current model>", "reason": "<audit id or user note>", "action": "deleted|rewritten|kept|merged"}`. This is what makes future `blame` instant and conflict arbitration mechanical.
-6. **Constitution hook (offer, don't auto-do)**: for decisions that KEPT or REWROTE a `severity: critical` rule (safety, access, prod), offer to author a probe test in `.hiviz/tests/<id>.toml` per the tests procedure. One offer, user decides.
-7. **Final report**: table file · bytes before→after · what was done · probe verdicts; plus a `git diff` for review. Do not commit.
+6. **Verify (deterministic, no model)**: `python <hiviz>/apply/verify.py --decisions .hiviz/decisions.md [--scope <dir you edited under>]`. Run it as it is — do not read or re-implement it, its output is the verdict. It compares every edited file with its backup and checks that exactly the approved edits happened: rows decided `no` / `keep` / empty and every Kept-safe line unchanged, `yes` rows applied, nothing else removed, changed or added, a backup for every edited file (and none for a file no decision names), a ledger entry per approved decision. Row status: `OK` · `REVIEW` (a rewrite or an `as-condition` edit — show the user the listed new text, a machine cannot judge it) · `UNVERIFIABLE` (the quote was not found) · `FAIL`, each FAIL ending in an action: `restore` = put the file back from its `.bak-<date>` and report it, `apply` = an approved edit is missing, make it. Run it again until there is no FAIL. If an after-probe made you restore a line (step 4), verify lists that row as `apply` — keep the line and say why in the final report. `<hiviz>` = the hiviz engines dir, first that exists: `engines/` two levels above this skill's `SKILL.md` (plugin installs: `<skill dir>/../../engines`), `~/.hiviz/engines` (npm installer), or a hiviz repo checkout. It contains `apply/verify.py`.
+7. **Constitution hook (offer, don't auto-do)**: for decisions that KEPT or REWROTE a `severity: critical` rule (safety, access, prod), offer to author a probe test in `.hiviz/tests/<id>.toml` per the tests procedure. One offer, user decides.
+8. **Final report**: table file · bytes before→after · what was done · probe verdicts · the verify verdict (and every REVIEW edit); plus a `git diff` for review. Do not commit.
 

@@ -17,6 +17,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver;
   `render/report.py --summary` prints the same view for a terminal.
 - **`drift --active-checks auto|on|off`** (`HIVIZ_ACTIVE_CHECKS`, Action input `active-checks`).
 - Clear “needs Python >= 3.11” message instead of a `tomllib` traceback on older interpreters.
+- **`apply/verify.py` — a deterministic check that apply changed only what was approved** (no model). New step 6 of the
+  apply procedure: rows decided no / keep / empty and every kept-safe line unchanged, `yes` rows applied, no other line
+  removed, changed or added, a backup for every edited file and none for a file no decision names, a ledger entry per
+  approved decision. Rewrites and `as-condition` edits are listed for a human. Every FAIL says `restore` or `apply`.
+  It replaces trust in the model's word with a diff.
 
 ### Changed
 - **Audit report rows have six columns** — `| id | where | line | why | B | → verb |`: `where` is the absolute

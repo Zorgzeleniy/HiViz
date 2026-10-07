@@ -17,6 +17,7 @@ import sys
 import time
 
 from rig.core import OUT, _SECTION, hvfmt, summary
+from rig.apply import verify_checks
 from rig.discovery import discovery_checks
 from rig.engines import engine_checks
 from rig.installer import installer_checks, plugin_checks, plugin_install_checks, uninstall_checks, uninstall_edge_checks
@@ -34,6 +35,7 @@ def t1() -> None:
     plugin_install_checks()
     _SECTION[0] = None
     engine_checks()
+    verify_checks()
     format_checks()
     json_checks()
     installer_output_checks()

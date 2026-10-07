@@ -19,7 +19,7 @@ const render = (t) => t.replaceAll("{{AUDIT_BODY}}", AUDIT).replaceAll("{{APPLY_
 // Every rendered adapter embeds a core procedure, and each one starts with this heading.
 // Uninstall only deletes files that carry it, so same-named user files survive.
 const OWNERSHIP_MARK = "# HiViz ";
-const ENGINE_DIRS = ["meters", "drift", "constitution", "blame", "translate", "render", "core"];
+const ENGINE_DIRS = ["meters", "drift", "constitution", "blame", "translate", "render", "apply", "core"];
 
 const HOME = os.homedir();
 const envDir = (name, fallback) => {

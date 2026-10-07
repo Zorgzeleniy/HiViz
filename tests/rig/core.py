@@ -102,6 +102,12 @@ def fresh_home(name: str) -> Path:
     return home
 
 
+def engine_dirs() -> list[str]:
+    """The engine directories the installer ships — one source of truth: ENGINE_DIRS in bin/hiviz.js."""
+    m = re.search(r"const ENGINE_DIRS = \[([^\]]*)\]", (REPO / "bin/hiviz.js").read_text(encoding="utf-8"))
+    return re.findall(r'"([^"]+)"', m.group(1)) if m else []
+
+
 def find_browser() -> str | None:
     cands = ["google-chrome", "chromium", "chromium-browser", "chrome", "msedge"]
     for var in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):

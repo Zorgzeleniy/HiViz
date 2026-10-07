@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 from .harness import HARNESSES, Harness
-from .core import GT, HOME, OUT, REPO, RESULTS, _SECTION, browser_export, check, hvfmt, sh
+from .core import GT, engine_dirs, HOME, OUT, REPO, RESULTS, _SECTION, browser_export, check, hvfmt, sh
 
 
 PROFILE = HOME / ".omp/profiles/hiviz-test/agent"
@@ -63,6 +63,10 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         text = (REPO / "templates" / tpl).read_text(encoding="utf-8")
         (prof / "skills" / name / "SKILL.md").write_text(
             text.replace(key, (REPO / "core" / core).read_text(encoding="utf-8")), encoding="utf-8")
+    # the engines the skills run (`<hiviz>/apply/verify.py`, drift, meters …) come from THIS checkout, found the way a plugin
+    # install is found: `engines/` two levels above a skill's SKILL.md — not from a stale ~/.hiviz/engines of the machine
+    for d in engine_dirs():
+        shutil.copytree(REPO / d, prof / "engines" / d, ignore=shutil.ignore_patterns("__pycache__"))
     for name, sub in [("superpowers", "superpowers/skills"), ("anthropic", "anthropic-skills/skills")]:
         vendor = REPO / "tests/fixture/vendor" / sub
         for d in sorted(vendor.iterdir()):
@@ -72,6 +76,7 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         link = prof / h.skills_dir
         link.parent.mkdir(parents=True, exist_ok=True)
         link.symlink_to(os.path.relpath(prof / "skills", link.parent), target_is_directory=True)
+        (link.parent / "engines").symlink_to(os.path.relpath(prof / "engines", link.parent), target_is_directory=True)
         for rel, text in h.extras.items():   # e.g. opencode must be told to load RULES.md so the safety probes can quote it
             (prof / rel).write_text(text, encoding="utf-8")
     (prof / "config.yml").write_text(
@@ -338,6 +343,7 @@ def t2x() -> None:
         r = sh(agent_cmd(prompt), timeout=2400)
         ph.status = "OK" if r.returncode == 0 else "FAIL"
     (OUT / "apply-t2x-output.txt").write_text(((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
+    oracle_from = len(RESULTS)   # the checks below are an independent line-by-line oracle for apply/verify.py
     ag_after = (PROFILE / "AGENTS.md").read_text(encoding="utf-8").splitlines()
     sk_txt = (PROFILE / "skills/smelly-skill/SKILL.md").read_text(encoding="utf-8")
     old, new = [x.strip() for x in before["agents"] if x.strip()], [x.strip() for x in ag_after if x.strip()]
@@ -359,4 +365,20 @@ def t2x() -> None:
     check("export→apply: fixture source untouched, backups written",
           all(_h(f) == h for f, h in fx.items()) and len(list(PROFILE.glob("**/*.bak-*"))) >= 2,
           f"{len(list(PROFILE.glob('**/*.bak-*')))} .bak files")
+    oracle_ok = all(ok for _, ok, _ in RESULTS[oracle_from:])
+    v = sh([sys.executable, "apply/verify.py", "--decisions", str(OUT / "decisions.md"), "--scope", str(PROFILE), "--format", "json",
+            "--out", str(OUT / "verify.json")])
+    try:
+        doc = json.loads(v.stdout)
+    except ValueError:
+        doc = {"summary": {"FAIL": -1}, "rows": []}
+    by = {r["id"]: r["status"] for r in doc["rows"]}
+    fails = [f"{r['id']}: {r['detail'][:70]}" for r in doc["rows"] if r["status"] == "FAIL"]
+    verify_ok = v.returncode == 0 and doc["summary"]["FAIL"] == 0
+    check("export→apply: apply/verify.py agrees with the independent oracle (no FAIL ⇔ exactly the approved edits)",
+          verify_ok == oracle_ok, f"verify={'ok' if verify_ok else 'FAIL'} oracle={'ok' if oracle_ok else 'FAIL'} " + "; ".join(fails[:3]))
+    if oracle_ok:   # when the model did it right the verifier must also know every row: nothing UNVERIFIABLE, C1 left to a human
+        check("export→apply: verify.py knows every row — deletions OK, the condition listed for review, ledger and backups fine",
+              by.get("ledger") == "OK" and by.get("C1") == "REVIEW" and all(by.get(r) == "OK" for r in ("D01", "D02", "D04", "D06", "D03", "D05", "D07"))
+              and doc["summary"]["UNVERIFIABLE"] == 0, f"{doc['summary']}")
     _SECTION[0] = None

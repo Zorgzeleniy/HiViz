@@ -37,6 +37,7 @@ STATUS = {
     "FLAKY": ("◐", "~", "yellow"),
     "UNVERIFIABLE": ("○", "?", "yellow"), "ORPHANED": ("○", "?", "yellow"),
     "SKIP": ("–", "-", "gray"),
+    "REVIEW": ("✎", "~", "yellow"),
     # audit-report verbs (→ verb column)
     "delete": ("✘", "x", "red"), "disable": ("⊘", "x", "red"),
     "rewrite": ("✎", "~", "yellow"), "merge": ("⇄", "=", "cyan"),

@@ -273,6 +273,7 @@ class Row:
     i: int = 0
     cat: str = ""
     ev: str = ""
+    decision: str = ""     # the DECISION column of an exported / filled decisions.md
     reason: str = ""
     other: str = ""        # side B of a conflict: location
     other_q: str = ""      # side B of a conflict: quote
@@ -288,7 +289,7 @@ def parse_rows(head: list[str], body: list[list[str]], sec: str) -> list[Row]:
     low = [(re.match(r"[a-z]+", re.sub(r"^[^a-z]+", "", h.lower())) or re.match(r"", h)).group(0) for h in head]
     ix = {}
     for k, names in (("id", ("id",)), ("where", ("where", "file", "location")), ("line", ("line",)),
-                     ("why", ("why",)), ("b", ("b", "bytes", "size")), ("verb", ("verb",))):
+                     ("why", ("why",)), ("b", ("b", "bytes", "size")), ("verb", ("verb",)), ("decision", ("decision",))):
         for j, h in enumerate(low):
             if h in names:
                 ix[k] = j
@@ -310,6 +311,7 @@ def parse_rows(head: list[str], body: list[list[str]], sec: str) -> list[Row]:
         verb = clean(g("verb"))   # models copy the header's arrow into the cell
         r = Row(id=g("id"), sec=sec, where=g("where"), line=g("line"), why=g("why"),
                 b=int(digits) if digits else None, verb=verb, i=n)
+        r.decision = g("decision")
         r.cat, r.ev, r.reason = split_why(r.why)
         parts = [p.strip() for p in re.split(r"\s*⇄\s*", r.where)] if r.where else []
         if len(parts) == 2:

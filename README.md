@@ -52,7 +52,7 @@ Cursor, Windsurf and OpenCode: use `npx`. Where each harness gets what, env over
 
 1. **Run the audit.** `/hv-audit` (Claude Code, OpenCode), the `hv-audit` skill (Codex, omp, pi, Cursor, Windsurf) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule — conflicts flagged, a recommendation for each.
 2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / keep — or open `.hiviz/report.html`, which lists every row with its file, size and reason, batches decisions by category, and exports the same `decisions.md` (save it as `.hiviz/decisions.md`). HiViz never decides for you — nothing is pre-filled, and analysis and action are separate sessions, on purpose.
-3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule. A probe that fails restores the line from backup.
+3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule (a probe that fails restores the line from backup), then a deterministic check — `apply/verify.py`, no model — that only what you approved changed: rows you decided *no* or left empty and every safety line untouched, nothing else removed, changed or added, every edited file backed up, every decision in the ledger. Rewrites and conditional edits are listed for you to read.
 4. **Check drift.** `/hv-drift` diffs your facts registry against the live machine — milliseconds, no LLM.
 5. **Test your constitution.** `/hv-test` runs probe tests for your load-bearing rules. Run it before merging changes to instruction files — a FAIL means the change broke a rule's binding. Probes need an agent CLI, so they run locally or in a CI job that has one (the bundled GitHub Action runs drift only).
 
@@ -220,7 +220,7 @@ Fourteen tools, 1,430 tokens, every single session, zero invocations ever. That 
 | Command / skill               | What it does                                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------------------------------- |
 | `/hv-audit`                   | sorts every line (invariant / trained-duplicate / relic / 90%-rule), flags conflicts → report + decisions file (you decide) |
-| `/hv-apply`                   | executes exactly your decisions: backups, edits, ledger, probes that quote every surviving rule |
+| `/hv-apply`                   | executes exactly your decisions: backups, edits, ledger, probes that quote every surviving rule, then `verify` — a deterministic check that nothing else changed |
 | `/hv-drift`                   | facts-vs-environment diff: which standing facts are STALE                                       |
 | `/hv-test` (`hv-constitution`) | constitution tests: prove rules are LIVE in fresh sessions                                     |
 | `/hv-translate`               | migrate the corpus between harnesses (any of the 7 ↔ any), probe-checked equivalence            |
@@ -312,7 +312,7 @@ The five invariants are the product. Breaking any of them is a semver-major deci
 1. **Never rewrites during audit.** Analysis and action are separate sessions; decisions are yours.
 2. **Never deletes safety lines.** Secrets, access, prod, commit/push gates are marked invariants — dedup/move only.
 3. **Never edits without a `.bak-<date>` backup** next to the file.
-4. **Never adds anything of its own.** Apply performs exactly the approved decisions, word for word.
+4. **Never adds anything of its own.** Apply performs exactly the approved decisions, word for word — and `apply/verify.py` checks it afterwards, line by line.
 5. **Never claims a rule survived without a probe.** Verification = a fresh headless session quoting the rule.
 
 ---
