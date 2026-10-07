@@ -183,7 +183,7 @@ def main() -> int:
     ap.add_argument("--name", default="Agent instructions")
     ap.add_argument("--check", action="store_true",
                     help="verify live files at --out against the IR emission instead of writing")
-    hvfmt.add_format_arg(ap)
+    hvfmt.add_format_arg(ap, allow_json=False)
     a = ap.parse_args()
     hvfmt.configure(a.format)
     kept, dropped = load_ir(Path(a.ir))

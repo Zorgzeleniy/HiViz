@@ -262,11 +262,13 @@ function syncTree(src, dst, dry) {
 
 // ---- output: md (plain text — what pipes, CI and agents get) | pretty (symbols + color on a terminal) | json (status only).
 // Same switches as the python engines: --format, HIVIZ_FORMAT, NO_COLOR, FORCE_COLOR, HIVIZ_ASCII.
-function resolveFormat(argv, env, isTTY) {
+const formatFlag = (argv) => {
   const i = argv.indexOf("--format");
   const eq = argv.find((a) => a.startsWith("--format="));
-  const flag = i >= 0 ? argv[i + 1] || "" : eq ? eq.slice(9) : "";
-  const v = (flag || env.HIVIZ_FORMAT || "").trim().toLowerCase();
+  return (i >= 0 ? argv[i + 1] || "" : eq ? eq.slice(9) : "").trim().toLowerCase();
+};
+function resolveFormat(argv, env, isTTY) {
+  const v = (formatFlag(argv) || env.HIVIZ_FORMAT || "").trim().toLowerCase();
   return ["pretty", "md", "json"].includes(v) ? v : isTTY ? "pretty" : "md";
 }
 const FMT = resolveFormat(process.argv, process.env, Boolean(process.stdout.isTTY));
@@ -422,7 +424,8 @@ if (require.main === module) {
   const args = process.argv.slice(2).filter((a, i, all) => !a.startsWith("-") && all[i - 1] !== "--format");
   const cmd = args[0] || "status";
   const dry = process.argv.includes("--dry");
-  if (FMT === "json" && cmd !== "status") { console.error("hiviz: --format json is supported for `status` only"); process.exit(2); }
+  // an explicit flag is refused; HIVIZ_FORMAT=json in the environment just means "json where there is any" (init/uninstall print text)
+  if (formatFlag(process.argv) === "json" && cmd !== "status") { console.error("hiviz: --format json is supported for `status` only"); process.exit(2); }
   if (cmd === "status") status();
   else if (cmd === "init") install(dry);
   else if (cmd === "uninstall") uninstall(dry);

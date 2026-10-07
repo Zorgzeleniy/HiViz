@@ -46,10 +46,14 @@ _BOX_U = dict(tl="╭", tr="╮", bl="╰", br="╯", h="─", v="│", t="┬",
 _BOX_A = dict(tl="+", tr="+", bl="+", br="+", h="-", v="|", t="+", b="+", l="+", r="+", x="+")
 
 
-def add_format_arg(ap) -> None:
-    ap.add_argument("--format", choices=("auto", "pretty", "md", "json"), default="auto",
-                    help="human output (pretty), markdown for agents/CI (md) or one JSON document on stdout (json); "
-                         "auto = pretty on a terminal, else md ($HIVIZ_FORMAT overrides auto)")
+def add_format_arg(ap, allow_json: bool = True) -> None:
+    """--format for an engine. allow_json=False for engines that print no JSON: the flag is refused (exit 2) rather
+    than answered with text a script would then fail to parse. HIVIZ_FORMAT=json is only a preference: such an
+    engine falls back to md."""
+    ap.add_argument("--format", choices=("auto", "pretty", "md") + (("json",) if allow_json else ()), default="auto",
+                    help="human output (pretty), markdown for agents/CI (md)"
+                         + (" or one JSON document on stdout (json)" if allow_json else "")
+                         + "; auto = pretty on a terminal, else md ($HIVIZ_FORMAT overrides auto)")
 
 
 def _isatty(stream) -> bool:

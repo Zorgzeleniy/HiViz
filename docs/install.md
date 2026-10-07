@@ -10,6 +10,8 @@ npx @zorgzeleniy/hiviz init --dry    # show what it would write
 npx @zorgzeleniy/hiviz status        # what is detected and installed
 ```
 
+On a terminal these print symbols and a status table; piped they print plain text. `status --format json` gives one JSON document for scripts (`NO_COLOR`, `HIVIZ_ASCII=1` and `HIVIZ_FORMAT` are honored).
+
 It detects each harness by its config dir and writes:
 
 | Harness     | Detected by                          | Gets                                                                 |

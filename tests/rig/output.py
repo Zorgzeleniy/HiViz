@@ -221,6 +221,12 @@ def json_checks() -> None:
     check("json: drift, constitution, blame, meters, report each print ONE parseable document (exit codes unchanged)",
           all([ok_drift, ok_const, ok_blame, ok_meters, ok_report]),
           f"drift={bool(ok_drift)} constitution={bool(ok_const)} blame={bool(ok_blame)} meters={bool(ok_meters)} report={bool(ok_report)}")
+    tr = sh([py, "translate/emit.py", "--ir", "tests/fixture/ir.jsonl", "--target", "pi", "--out", str(OUT / "tr_json"), "--format", "json"], env=env)
+    tr_env = sh([py, "translate/emit.py", "--ir", "tests/fixture/ir.jsonl", "--target", "pi", "--out", str(OUT / "tr_json")],
+                env={**env, "HIVIZ_FORMAT": "json"})
+    check("json: translate (no JSON output) refuses `--format json` with exit 2 and prints nothing; HIVIZ_FORMAT=json falls back to text",
+          tr.returncode == 2 and "invalid choice" in tr.stderr and not tr.stdout.strip() and tr_env.returncode == 0 and "IR:" in tr_env.stdout,
+          f"rc={tr.returncode}/{tr_env.returncode}")
     oem = sh([py, "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml", "--base", "tests/fixture", "--format", "json"],
              env={**env, "PYTHONIOENCODING": "cp866"})
     check("json: output is ASCII-only, so it survives any stream encoding (cp866)",
@@ -256,5 +262,7 @@ def installer_output_checks() -> None:
     check("installer: NO_COLOR drops color, HIVIZ_ASCII drops every non-ASCII glyph",
           "\x1b" not in nc.stdout and "╭" in nc.stdout and asc.stdout.isascii() and asc_t.stdout.isascii() and "+---" in asc_t.stdout, "")
     bad = sh(["node", "bin/hiviz.js", "init", "--format", "json"], env=e)
-    check("installer: --format json is refused for init (status only) with exit 2, nothing written",
-          bad.returncode == 2 and "status" in bad.stderr and not (home / ".agents").exists(), f"rc={bad.returncode}")
+    envj = sh(["node", "bin/hiviz.js", "init", "--dry"], env={**e, "HIVIZ_FORMAT": "json"})
+    check("installer: an explicit --format json is refused for init (exit 2, nothing written); HIVIZ_FORMAT=json is not",
+          bad.returncode == 2 and "status" in bad.stderr and not (home / ".agents").exists()
+          and envj.returncode == 0 and "would write" in envj.stdout, f"rc={bad.returncode}/{envj.returncode}")

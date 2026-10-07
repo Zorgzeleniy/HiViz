@@ -35,7 +35,7 @@ npx @zorgzeleniy/hiviz init
 
 Detects every supported agent on your machine, installs the commands and skills each one reads, and deploys the python engines to `~/.hiviz/engines`. Safe to re-run; `npx @zorgzeleniy/hiviz uninstall` removes only what it wrote (preview with `--dry`).
 
-**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. Every engine prints for humans on a terminal and plain markdown when piped; `--format json` gives one JSON document for scripts (`NO_COLOR`, `HIVIZ_ASCII=1` and `HIVIZ_FORMAT` are honored).
+**Requirements:** Node ≥ 16 (installer) · Python ≥ 3.11 (engines). The audit and apply run inside YOUR agent session on your existing plan — no extra API keys; the deterministic engines (drift, meters, blame) call no model at all. On a terminal the engines and the installer print tables with status symbols; piped (agents, CI) they print the same plain markdown as before. `--format json` gives one JSON document from `drift`, `constitution`, `blame`, `meters`, the report summary and `hiviz status`; `--format md|pretty` forces a style (`NO_COLOR`, `HIVIZ_ASCII=1` and `HIVIZ_FORMAT` are honored).
 
 **Or through your agent's own plugin manager** — same skills, engines bundled:
 
@@ -51,7 +51,7 @@ Cursor, Windsurf and OpenCode: use `npx`. Where each harness gets what, env over
 ## 🕐 How it works
 
 1. **Run the audit.** `/hv-audit` (Claude Code, OpenCode), the `hv-audit` skill (Codex, omp, pi, Cursor, Windsurf) or just ask *"audit my prompt debt"*. You get a report: every line categorized — invariant / trained-duplicate / relic / 90%-rule — conflicts flagged, a recommendation for each.
-2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / keep — or open `.hiviz/report.html`, which lists every row with its file, size and reason, batches decisions by category, and exports the same `decisions.md`. HiViz never decides for you — nothing is pre-filled, and analysis and action are separate sessions, on purpose.
+2. **Decide.** Fill the DECISION column in `.hiviz/decisions.md`: yes / no / as-condition / keep — or open `.hiviz/report.html`, which lists every row with its file, size and reason, batches decisions by category, and exports the same `decisions.md` (save it as `.hiviz/decisions.md`). HiViz never decides for you — nothing is pre-filled, and analysis and action are separate sessions, on purpose.
 3. **Apply.** `/hv-apply` executes exactly your decisions: `.bak` backups first, then edits, then fresh headless probes quoting each surviving rule. A probe that fails restores the line from backup.
 4. **Check drift.** `/hv-drift` diffs your facts registry against the live machine — milliseconds, no LLM.
 5. **Test your constitution.** `/hv-test` runs probe tests for your load-bearing rules. Run it before merging changes to instruction files — a FAIL means the change broke a rule's binding. Probes need an agent CLI, so they run locally or in a CI job that has one (the bundled GitHub Action runs drift only).
