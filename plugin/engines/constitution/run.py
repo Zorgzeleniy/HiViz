@@ -21,7 +21,9 @@ import shutil
 import subprocess
 import sys
 import time
-import tomllib
+if sys.version_info < (3, 11):  # tomllib is stdlib from 3.11
+    sys.exit(f"hiviz constitution needs Python >= 3.11 (found {sys.version.split()[0]}) — install a newer Python or run it with `python3.11`")
+import tomllib  # noqa: E402
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "render"))
@@ -118,7 +120,7 @@ def evaluate(answer: str, t: dict) -> tuple[bool, str]:
             break
     else:
         if include:
-            return False, f"none of must_include_any matched"
+            return False, "none of must_include_any matched"
     for pattern in t.get("must_not_match") or []:
         if re.search(pattern, answer, re.IGNORECASE):
             return False, f"must_not_match matched: {pattern}"

@@ -5,7 +5,9 @@ T1 (deterministic, free, hermetic — every harness gets its own fake $HOME unde
    installer per harness, meters vs fake stdio/HTTP MCP, drift, constitution, blame, translate.
 T2 (E2E, LLM): audit -> ground-truth check -> deterministic decisions -> apply -> post-asserts.
 
-Usage: python tests/run.py [--t1|--t2|--all]   (default: --all)
+T2x (E2E, LLM): report page -> clicked decisions -> exported decisions.md -> hv-apply -> only those edits.
+
+Usage: python tests/run.py [--t1|--t2|--t2x|--all]   (default: --t1)
 """
 from __future__ import annotations
 
@@ -33,7 +35,7 @@ _SECTION: list[str | None] = [None]
 
 
 def group_of(name: str) -> str:
-    return re.split(r"[ :\[]", name, 1)[0]
+    return re.split(r"[ :\[]", name, maxsplit=1)[0]
 
 
 def check(name: str, ok: bool, detail: str = "") -> None:
@@ -506,6 +508,35 @@ print(json.dumps(out))
 """
 
 
+def find_browser() -> str | None:
+    cands = ["google-chrome", "chromium", "chromium-browser", "chrome", "msedge"]
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        root = os.environ.get(var)
+        if root:
+            cands += [str(Path(root) / "Google/Chrome/Application/chrome.exe"),
+                      str(Path(root) / "Microsoft/Edge/Application/msedge.exe")]
+    return next((b for b in cands if shutil.which(b)), None)
+
+
+def browser_export(page: str, drive_js: str) -> str | None:
+    """Open the report page headless, run `drive_js` (clicks), return the decisions.md preview the page built.
+    None = no browser or no DOM. A fresh localStorage key per run (the page persists decisions)."""
+    import html as _h
+    browser = find_browser()
+    if not browser:
+        return None
+    fresh = re.sub(r'"key": "[0-9a-f]+"', f'"key": "t{time.time_ns()}"', page, count=1)
+    drv = OUT / "report_drive.html"
+    drv.write_text(fresh.replace("</body>", drive_js + "</body>"), encoding="utf-8")
+    # no --user-data-dir: a custom profile dir hangs headless Chrome in some sandboxes
+    dom = sh([browser, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=4000",
+              "--dump-dom", drv.as_uri()], timeout=60)
+    if dom.returncode == 124 or not (dom.stdout or "").strip():
+        return None
+    m = re.search(r"<pre id=\"prev\">(.*?)</pre>", dom.stdout, re.S)
+    return _h.unescape(m.group(1)) if m else ""
+
+
 def format_checks() -> None:
     drift = [sys.executable, "drift/check.py", "--facts", "tests/fixture/hiviz/facts.toml",
              "--base", "tests/fixture"]
@@ -623,31 +654,16 @@ def report_checks() -> None:
           sm.returncode == 0 and "2 act now" in sm.stdout and "kept safe" in sm.stdout and "D16" in sm.stdout
           and "SKILL.md:9" in sm.stdout and sa.returncode == 0 and sa.stdout.isascii() and "Traceback" not in sa.stderr,
           (sa.stderr.strip().splitlines() or [""])[-1])
-    cands = ["google-chrome", "chromium", "chromium-browser", "chrome", "msedge"]
-    for var in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
-        root = os.environ.get(var)
-        if root:
-            cands += [str(Path(root) / "Google/Chrome/Application/chrome.exe"),
-                      str(Path(root) / "Microsoft/Edge/Application/msedge.exe")]
-    browser = next((b for b in cands if shutil.which(b)), None)
-    if not browser:
-        check("report: export round-trip in a browser (skipped — no Chrome/Chromium)", True)
-        return
-    drive = ("<script>var q=function(k,v){document.querySelector('.row[data-id='+k+'] button[data-v='+v+']').click()};"
-             "q('C2','no');q('D05','cond');var n=document.querySelector('.row[data-id=D05] input.note');"
-             "n.value='only the relevant tests';n.dispatchEvent(new Event('input',{bubbles:true}));n.blur();"
-             "q('D19','keep');document.querySelector('.chip[data-cat=trained-dup] button').click();</script>")
-    # fresh localStorage key per run: the page persists decisions, a custom --user-data-dir hangs headless Chrome here
-    fresh = re.sub(r'"key": "[0-9a-f]+"', f'"key": "t{time.time_ns()}"', page, count=1)
-    drv = OUT / "report_drive.html"
-    drv.write_text(fresh.replace("</body>", drive + "</body>"), encoding="utf-8")
-    dom = sh([browser, "--headless=new", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=4000",
-              "--dump-dom", drv.as_uri()], timeout=60)
-    import html as _h
-    m = re.search(r"<pre id=\"prev\">(.*?)</pre>", dom.stdout or "", re.S)
-    exp = _h.unescape(m.group(1)) if m else ""
-    if dom.returncode == 124 or not (dom.stdout or "").strip():
-        check("report: browser export round-trip (skipped — the browser produced no DOM)", True, "")
+    sm_md = sh([sys.executable, "render/report.py", "--md", str(fx), "--summary", "--format", "md"], env=env)
+    check("report: --summary --format md is plain markdown (no box drawing, no color) for agents and CI",
+          sm_md.returncode == 0 and sm_md.stdout.startswith("# ") and "| id | verb |" in sm_md.stdout
+          and "| D16 |" in sm_md.stdout and not any(ch in sm_md.stdout for ch in "╭│─✔✘\x1b"), "")
+    exp = browser_export(page, "<script>var q=function(k,v){document.querySelector('.row[data-id='+k+'] button[data-v='+v+']').click()};"
+                              "q('C2','no');q('D05','cond');var n=document.querySelector('.row[data-id=D05] input.note');"
+                              "n.value='only the relevant tests';n.dispatchEvent(new Event('input',{bubbles:true}));n.blur();"
+                              "q('D19','keep');document.querySelector('.chip[data-cat=trained-dup] button').click();</script>")
+    if exp is None:
+        check("report: export round-trip in a browser (skipped — no Chrome/Chromium/Edge, or it produced no DOM)", True, "")
         return
     row = lambda k: next((l for l in exp.splitlines() if l.startswith(f"| {k} |")), "")
     ok = (bool(exp) and row("C2").endswith("| delete | no |") and row("D19").endswith("| delete | keep |")
@@ -656,7 +672,7 @@ def report_checks() -> None:
           and row("C1").endswith("| verify |  |") and row("K12").endswith("| keep | keep |")
           and "\\| Excuse \\| Reality" in row("D16") and "⇄" in row("C1") and "## ⚪ Kept safe" in exp)
     check("report: browser export — decisions, batch skips decided rows, undecided stays empty, pipes escaped", ok,
-          f"{len(exp.splitlines())} lines" if exp else (dom.stderr or "no preview")[-100:])
+          f"{len(exp.splitlines())} lines" if exp else "no preview")
 
 
 def t1() -> None:
@@ -1004,6 +1020,132 @@ def t2() -> None:
                 f"model={T2_MODEL if T2_HARNESS == 'opencode' else 'glm-5.3-flash:high'} "
                 f"passed={len(RESULTS) - len([r for r in RESULTS if not r[1]])}/{len(RESULTS)}\n")
 
+# T2x: the human path — report page -> clicked decisions -> exported decisions.md -> hv-apply -> only those edits.
+T2X_COND = "update the gateway line to 10.0.0.99 (migrated 2026-03); keep `npm run deploy`"
+T2X_EXPECT = {"C1": f"as-condition: {T2X_COND}", "D01": "yes", "D02": "yes", "D03": "no", "D04": "yes",
+              "D05": "", "D06": "yes", "D07": "keep"}
+
+
+def t2x_report(profile: Path) -> str:
+    """A funnel report over the profile's real files (paths, line numbers and byte counts are measured)."""
+    ag, sk, ru = profile / "AGENTS.md", profile / "skills/smelly-skill/SKILL.md", profile / "RULES.md"
+
+    def find(path: Path, marker: str) -> tuple[int, int]:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        i = next(n for n, line in enumerate(lines, 1) if marker in line)
+        return i, len(lines[i - 1].encode("utf-8")) + 1
+
+    def row(rid: str, path: Path, marker: str, why: str, verb: str, b: bool = True) -> str:
+        i, size = find(path, marker)
+        return f"| {rid} | {path.as_posix()}:{i} | `{marker}` | {why} | {size if b else 0} | {verb} |"
+
+    sk_lines = sk.read_text(encoding="utf-8").splitlines()
+    f0 = next(n for n, line in enumerate(sk_lines, 1) if line.startswith("```"))
+    f1 = next(n for n, line in enumerate(sk_lines, 1) if n > f0 and line.startswith("```"))
+    block = sum(len(x.encode("utf-8")) + 1 for x in sk_lines[f0 - 1:f1])
+    i13, _ = find(ag, "10.0.0.42")
+    i9, _ = find(sk, "10.0.0.99")
+    head = "| id | where | line | why | B | → verb |\n|---|---|---|---|---:|---|"
+    rows = {
+        "act": [f"| C1 | {ag.as_posix()}:{i13} ⇄ {sk.as_posix()}:{i9} | `the staging gateway answers at 10.0.0.42 (legacy)` "
+                f"| conflict: B says «The staging gateway is 10.0.0.99» — two deploy targets | 0 | verify |"],
+        "call": [
+            row("D01", ag, "Write clean, readable code and follow best practices.", "trained-dup: [INFERENCE] model default", "delete"),
+            row("D02", ag, "Be careful and thorough when editing files.", "trained-dup: [INFERENCE] no actionable threshold", "delete"),
+            row("D03", ag, "Be concise and professional in commit messages and PRs.", "trained-dup: [INFERENCE] style default", "delete"),
+            row("D04", ag, "Final stack state (2026-01-15)", "relic: fact: 264-day-old snapshot", "delete"),
+            row("D05", ag, "NEVER use the `git stash` command.", "90%-rule: [INFERENCE] stated as an absolute", "rewrite"),
+            row("D06", sk, "Always include a summary table in every response", "90%-rule: [INFERENCE] table on a one-line answer", "delete"),
+            f"| D07 | {sk.as_posix()}:{f0}-{f1} | `scan complete … blocked 47 threats` | few-shot: fact: fabricated output block | {block} | delete |",
+        ],
+        "safe": [row("K1", ru, "redact", "invariant: secrets rule", "keep", b=False),
+                 row("K2", ru, "explicit request", "invariant: commit gate", "keep", b=False)],
+    }
+    corpus = sum(f.stat().st_size for f in (ag, sk, ru))
+    shed = sum(int(r.split("|")[5]) for r in rows["call"] if r.rstrip().endswith(("delete |", "rewrite |")))
+    sec = lambda title, key: f"## {title}\n\n{head}\n" + "\n".join(rows[key]) + "\n"
+    return (f"# HiViz audit — t2x fixture\n\n🔴 1 act now · 🟡 {len(rows['call'])} your call · ⚪ {len(rows['safe'])} fine · "
+            f"corpus {corpus / 1024:.1f} KB → shed −{100 * shed / corpus:.1f}%\n\nCorpus {corpus:,} B.\n\n"
+            + sec("🔴 Act now", "act") + "\n" + sec("🟡 Your call", "call") + "\n" + sec("⚪ Kept safe", "safe"))
+
+
+T2X_DRIVE = (
+    "<script>var q=function(k,v){document.querySelector('.row[data-id=\"'+k+'\"] button[data-v='+v+']').click()};"
+    "q('D03','no');document.querySelector('.chip[data-cat=\"trained-dup\"] button').click();"  # batch must skip D03
+    "q('D04','yes');q('D06','yes');q('D07','keep');q('C1','cond');"
+    "var n=document.querySelector('.row[data-id=\"C1\"] input.note');"
+    f"n.value={json.dumps(T2X_COND)};n.dispatchEvent(new Event('input',{{bubbles:true}}));n.blur();</script>")
+
+
+def t2x() -> None:
+    import hashlib
+    import report as rp
+    print(hvfmt.heading("T2x · export → apply", f"{T2_HARNESS}"
+                        + (f" · {T2_MODEL}" if T2_HARNESS == "opencode" else "") + " · real model") if hvfmt.is_pretty()
+          else "== T2x: export -> apply ==")
+    _SECTION[0] = "export→apply"
+    OUT.mkdir(parents=True, exist_ok=True)
+    o = OUT.as_posix()
+    profile_setup()
+    if T2_HARNESS == "omp" and not os.environ.get("ZAI_API_KEY"):
+        import sqlite3
+        src_db, dst_db = sqlite3.connect(str(HOME / ".omp/agent/agent.db")), sqlite3.connect(str(PROFILE / "agent.db"))
+        with dst_db:
+            src_db.backup(dst_db)
+        src_db.close()
+        dst_db.close()
+    md = t2x_report(PROFILE)
+    (OUT / "report-t2x.md").write_text(md, encoding="utf-8")
+    page = rp.render(md, "report-t2x")
+    (OUT / "report-t2x.html").write_text(page, encoding="utf-8")
+    exp = browser_export(page, T2X_DRIVE)
+    if exp is None:
+        check("export: browser available and produced a decisions.md", False, "needs Chrome/Chromium/Edge")
+        return
+    got = {}
+    for line in exp.splitlines():
+        cells = rp.split_row(line) if line.startswith("| ") else []
+        if len(cells) == 7 and cells[0] in (*T2X_EXPECT, "K1", "K2"):
+            got[cells[0]] = cells[6]
+    check("export: the page wrote exactly the clicked decisions (batch skipped D03, D05 left empty, K rows keep)",
+          all(got.get(k) == v for k, v in T2X_EXPECT.items()) and got.get("K1") == "keep" and got.get("K2") == "keep",
+          ", ".join(f"{k}={v[:12]!r}" for k, v in got.items() if got.get(k) != T2X_EXPECT.get(k, "keep")))
+    (OUT / "decisions.md").write_text(exp, encoding="utf-8")
+    _h = lambda f: hashlib.md5(Path(f).read_bytes()).hexdigest()
+    before = {"agents": (PROFILE / "AGENTS.md").read_text(encoding="utf-8").splitlines(),
+              "rules": _h(PROFILE / "RULES.md"), "clean": _h(PROFILE / "skills/clean-skill/SKILL.md")}
+    fx = {str(f): _h(f) for f in (REPO / "tests/fixture/agent").rglob("*") if f.is_file()}
+    # the DECISION semantics are deliberately NOT restated: the procedure (core/APPLY.md) must carry them
+    prompt = (f"Use the hv-apply procedure. The decisions file is {o}/decisions.md — it is final, exported from the report view; "
+              "apply exactly its rows, nothing else. There are no probe-worthy rules: skip the probes. "
+              f"Write the ledger to {o}/ledger.jsonl. Do not commit. English.")
+    with hvfmt.Phase("apply — model edits files from the exported decisions", budget=2400, hint=_bak_hint) as ph:
+        r = sh(agent_cmd(prompt), timeout=2400)
+        ph.status = "OK" if r.returncode == 0 else "FAIL"
+    (OUT / "apply-t2x-output.txt").write_text(((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
+    ag_after = (PROFILE / "AGENTS.md").read_text(encoding="utf-8").splitlines()
+    sk_txt = (PROFILE / "skills/smelly-skill/SKILL.md").read_text(encoding="utf-8")
+    old, new = [x.strip() for x in before["agents"] if x.strip()], [x.strip() for x in ag_after if x.strip()]
+    removed = [x for x in old if x not in new]
+    added = [x for x in new if x not in old]
+    expected_removed = ["- Write clean, readable code and follow best practices.", "- Be careful and thorough when editing files.",
+                        next(x for x in old if "Final stack state" in x), next(x for x in old if "10.0.0.42" in x)]
+    check("export→apply: yes rows deleted from AGENTS.md (D01, D02, D04)",
+          not any("follow best practices" in x or "Be careful and thorough" in x or "Final stack state" in x for x in ag_after), "")
+    check("export→apply: as-condition honoured — gateway line now 10.0.0.99, deploy command kept (C1)",
+          any("10.0.0.99" in x and "npm run deploy" in x for x in ag_after) and not any("10.0.0.42" in x for x in ag_after), "")
+    check("export→apply: no / keep / empty rows untouched (D03, D05, D07, K1, K2)",
+          any("Be concise and professional" in x for x in ag_after) and any("NEVER use the `git stash` command." in x for x in ag_after)
+          and "d41d8cd98f00b204e9800998ecf8427e" in sk_txt and _h(PROFILE / "RULES.md") == before["rules"], "")
+    check("export→apply: yes row in the skill deleted (D06)", "summary table" not in sk_txt, "")
+    check("export→apply: nothing else changed — exactly the approved lines removed, one line added",
+          sorted(removed) == sorted(expected_removed) and len(added) == 1 and _h(PROFILE / "skills/clean-skill/SKILL.md") == before["clean"],
+          f"removed={len(removed)} added={len(added)}")
+    check("export→apply: fixture source untouched, backups written",
+          all(_h(f) == h for f, h in fx.items()) and len(list(PROFILE.glob("**/*.bak-*"))) >= 2,
+          f"{len(list(PROFILE.glob('**/*.bak-*')))} .bak files")
+    _SECTION[0] = None
+
 
 def summary(elapsed: float = 0.0) -> int:
     failed = [r for r in RESULTS if not r[1]]
@@ -1011,7 +1153,7 @@ def summary(elapsed: float = 0.0) -> int:
         print(f"\n== {len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed ==")
         return 1 if failed else 0
     groups: dict[str, list[bool]] = {}
-    for (name, ok, _), g in zip(RESULTS, GROUPS):
+    for (_name, ok, _), g in zip(RESULTS, GROUPS, strict=True):
         groups.setdefault(g, []).append(ok)
     rows = [["PASS" if all(v) else "FAIL", g, f"{sum(v)}/{len(v)}",
              hvfmt.bar(sum(v), len(v))] for g, v in groups.items()]
@@ -1031,15 +1173,18 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--t1", action="store_true")
     ap.add_argument("--t2", action="store_true")
+    ap.add_argument("--t2x", action="store_true", help="export a decisions.md from the report page and apply it with a real model")
     ap.add_argument("--all", action="store_true")
     hvfmt.add_format_arg(ap)
     a = ap.parse_args()
     hvfmt.configure(a.format)
     t0 = time.monotonic()
-    if a.t1 or a.all or not (a.t1 or a.t2):
+    if a.t1 or a.all or not (a.t1 or a.t2 or a.t2x):
         t1()
     if a.t2 or a.all:
         t2()
+    if a.t2x:
+        t2x()
     return summary(time.monotonic() - t0)
 
 

@@ -17,7 +17,6 @@ import argparse
 import hashlib
 import html as H
 import json
-import os
 import re
 import sys
 from dataclasses import dataclass
@@ -305,7 +304,8 @@ def parse_rows(head: list[str], body: list[list[str]], sec: str) -> list[Row]:
             ix["verb"] = best[1]
     rows = []
     for n, cells in enumerate(body):
-        g = lambda k: cells[ix[k]] if k in ix and ix[k] < len(cells) else ""
+        def g(k: str, cells: list[str] = cells) -> str:
+            return cells[ix[k]] if k in ix and ix[k] < len(cells) else ""
         digits = re.sub(r"[^\d]", "", g("b"))
         verb = clean(g("verb"))   # models copy the header's arrow into the cell
         r = Row(id=g("id"), sec=sec, where=g("where"), line=g("line"), why=g("why"),
@@ -429,7 +429,7 @@ def common_dir(rows: list[Row]) -> str:
         return ""
     fold = (lambda x: x.lower()) if all(_DRIVE.match(d + "/") for d in dirs) else (lambda x: x)
     common = []
-    for segs in zip(*(d.split("/") for d in dirs)):
+    for segs in zip(*(d.split("/") for d in dirs), strict=False):   # stop at the shortest path
         if len({fold(x) for x in segs}) != 1:
             break
         common.append(segs[0])
@@ -675,8 +675,34 @@ def _plain(s: str) -> str:
     return re.sub(r"[`*]", "", s)
 
 
+def summary_md(md: str, md_path: str = "", html_path: str = "", decisions_path: str = "", limit: int = 8) -> str:
+    """Plain markdown summary — what an agent or a CI log gets: no box drawing, no color."""
+    rep = parse(md)
+    if rep is None:
+        return f"audit report {md_path}: not in the funnel format"
+    base = common_dir(all_rows(rep))
+    out = [f"# {rep.title}", "", rep.exec_line] if rep.exec_line else [f"# {rep.title}"]
+    for s in rep.sections:
+        if s["key"] == "safe" or not s["rows"]:
+            continue
+        rs = sorted(s["rows"], key=lambda r: -(r.b or 0))
+        out += ["", f"## {s['title']} ({len(rs)}, by effect)", "", "| id | verb | where | category | size | line |", "|---|---|---|---|---:|---|"]
+        for r in rs[:limit]:
+            line = " ".join(unwrap(r.line).split()).replace("|", "\\|")
+            out.append(f"| {r.id} | {r.verb} | {short(r.where, base) if r.where else ''} | {r.cat} | {fmt_b(r.b)} | {tail_end(line, 60)} |")
+        if len(rs) > limit:
+            out.append(f"\n… and {len(rs) - limit} more — all rows in the HTML view")
+    safe = next((len(s["rows"]) for s in rep.sections if s["key"] == "safe"), 0)
+    if safe:
+        out.append(f"\n{safe} lines kept safe — invariants, nothing to decide")
+    out += [f"\n{label}: {path}" for label, path in (("report", md_path), ("html", html_path), ("decisions", decisions_path)) if path]
+    return "\n".join(out)
+
+
 def terminal(md: str, md_path: str = "", html_path: str = "", decisions_path: str = "", limit: int = 8) -> str:
     """Human summary for the console: counts, top actions, the rows to decide (by effect), paths."""
+    if not hvfmt.is_pretty():
+        return summary_md(md, md_path, html_path, decisions_path, limit)
     rep = parse(md)
     out: list[str] = []
     P = out.append
@@ -717,7 +743,8 @@ def terminal(md: str, md_path: str = "", html_path: str = "", decisions_path: st
                 wa, wb = tail(short(r.where, base), 30), tail(short(r.other, base), 30)
                 w = max(len(wa), len(wb))
                 room = max(20, hvfmt.term_cols() - w - 14)
-                q = lambda t: hvfmt.style("“" + (t if len(t) <= room else t[:room - 1] + "…") + "”", "dim") if t else ""
+                def q(t: str, room: int = room) -> str:
+                    return hvfmt.style("“" + (t if len(t) <= room else t[:room - 1] + "…") + "”", "dim") if t else ""
                 P(f"  {hvfmt.style(sw, 'red')} {hvfmt.style(r.id, 'bold')}  {wa.ljust(w)}  {q(unwrap(r.line))}")
                 P(f"       {wb.ljust(w)}  {q(r.other_q)}")
     if counts.get("safe"):

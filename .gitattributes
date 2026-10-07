@@ -1,0 +1,2 @@
+# Generated trees (plugin/, catalogs) are compared byte-for-byte in CI: never let a platform rewrite line endings.
+* text=auto eol=lf

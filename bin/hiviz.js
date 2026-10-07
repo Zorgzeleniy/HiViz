@@ -136,6 +136,11 @@ function legacyTargets() {
 // so it is moved aside, never deleted.
 const legacyWindsurf = () => (readText(WINDSURF_RULES) || "").startsWith(LEGACY_WINDSURF_HEAD);
 
+// Node 16's rmSync swallows EACCES (the file stays, no error), so verify instead of trusting it.
+function rmChecked(p, opts) {
+  fs.rmSync(p, opts);
+  if (fs.existsSync(p) || isLink(p)) { const e = new Error(`EACCES: permission denied, rm '${p}'`); e.code = "EACCES"; throw e; }
+}
 const owned = (p) => (readText(p) || "").includes(OWNERSHIP_MARK);
 const isLink = (p) => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
 
@@ -179,7 +184,7 @@ function removeAdapter(file, label, dry, log) {
     }
     if (!owned(file)) { log(`  ! kept ${path.relative(HOME, file)} — not written by hiviz`); return 0; }
     if (dry) log(`  ~ would remove ${label} ${shown}`);
-    else { fs.rmSync(file, { force: true }); log(`  - removed ${label} ${shown}`); }
+    else { rmChecked(file, { force: true }); log(`  - removed ${label} ${shown}`); }
     if (isSkill) {
       const rest = (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((n) => !(dry && n === "SKILL.md"));
       if (rest.length) log(`  ! kept ${path.relative(HOME, dir)}/ — holds files hiviz did not write: ${rest.slice(0, 3).join(", ")}`);
@@ -214,7 +219,7 @@ function removeEngineDir(engines, shown, dry, log) {
   let n = 0;
   try {
     if (fs.existsSync(engines)) {
-      if (!dry) fs.rmSync(engines, { recursive: true, force: true });
+      if (!dry) rmChecked(engines, { recursive: true, force: true });
       log(`  ${dry ? "~ would remove" : "- removed"} ${shown}/engines`);
       n++;
     }
@@ -248,7 +253,7 @@ function syncTree(src, dst, dry) {
   if (fs.existsSync(dst)) {
     for (const e of fs.readdirSync(dst, { withFileTypes: true })) {
       if (e.name === "__pycache__" || srcNames.has(e.name)) continue;
-      if (!dry) fs.rmSync(path.join(dst, e.name), { recursive: true, force: true });
+      if (!dry) rmChecked(path.join(dst, e.name), { recursive: true, force: true });
       removed++;
     }
   }

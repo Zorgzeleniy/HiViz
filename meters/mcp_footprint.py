@@ -170,7 +170,10 @@ def _disabled(c: dict) -> bool:
 
 def load_servers(label: str, path: Path) -> dict[str, dict]:
     if path.suffix == ".toml":
-        import tomllib
+        try:
+            import tomllib
+        except ModuleNotFoundError:   # Python < 3.11: only TOML configs (Codex) are affected
+            raise RuntimeError("reading a TOML MCP config needs Python >= 3.11") from None
         data = tomllib.loads(path.read_text(encoding="utf-8"))
         out = {}
         for n, c in (data.get("mcp_servers") or {}).items():

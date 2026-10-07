@@ -1,0 +1,6 @@
+# Minimal lint gate: real bugs only (pyflakes + bugbear). Generated and vendored trees are skipped.
+target-version = "py311"
+extend-exclude = ["bench", "plugin", "tests/fixture"]
+
+[lint]
+select = ["F", "B"]
