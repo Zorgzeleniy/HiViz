@@ -131,7 +131,9 @@ def report_checks() -> None:
     model_style = "\n".join(["🔴 1 act now · 🟡 0 your call · ⚪ 0 fine · corpus 1.0 KB → shed −1%", "",
                              "## 🔴 Act now", "",
                              "| id | where | line ≤60 chars | why ≤80 chars | B | → verb |",
-                             "| R1 | /w/A.md:3 ⇄ /w/B.md:9 | the gateway is .42 | conflict: B says «the gateway is .99» — two IPs | 0 | verify |"])
+                             "| R1 | /w/A.md:3 ⇄ /w/B.md:9 | the gateway is .42 | conflict: B says «the gateway is .99» — two IPs | 0 | verify |",
+                             "| R2 | `/w/A.md:5` | the second | trained-dup: x | 12 | delete |",
+                             "| R3 | `/w/A.md:7` ⇄ **`/w/B.md:2`** | the third | conflict: B says «other» — differs | 0 | verify |"])
     def winify(text: str, sep: str) -> str:
         return re.sub(r"/work/profile[^ |:]*", lambda m: "C:" + m.group(0).replace(
             "/work/profile", "/Users/dev/.omp/profiles/hiviz-test/agent").replace("/", sep), text)
@@ -150,9 +152,11 @@ def report_checks() -> None:
           ok_win, "")
     mrep = rp.parse(model_style)
     mr = rp.all_rows(mrep)[0] if mrep and rp.all_rows(mrep) else None
-    check("report: grammar-template headers and a missing separator row are tolerated",
+    check("report: grammar-template headers, a missing separator row and paths wrapped in backticks / bold are tolerated",
           bool(mr and mr.line == "the gateway is .42" and mr.b == 0 and mr.verb == "verify" and mr.other == "/w/B.md:9"
-               and mr.other_q == "the gateway is .99" and mr.cat == "conflict"), "")
+               and mr.other_q == "the gateway is .99" and mr.cat == "conflict"
+               and [x.where for x in rp.all_rows(mrep)] == ["/w/A.md:3", "/w/A.md:5", "/w/A.md:7"]
+               and rp.all_rows(mrep)[2].other == "/w/B.md:2"), "")
     lrep = rp.parse(legacy)
     lh = rp.render(legacy, "legacy")
     check("report: older 4-column reports still render (no where / B)",

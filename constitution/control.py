@@ -109,10 +109,13 @@ def _git_init(dst: Path, like: Path) -> None:
         pass
 
 
-def build(corpus: Path, dst: Path, needle: str | None, mode: str, canary: str = "") -> list[str]:
-    """Fill `dst` from `corpus`. mode: ablate (needle lines removed) | canary (intact, canary line appended to every file
-    holding the needle) | empty (nothing copied). -> relative paths of the files that hold the needle."""
+def build(corpus: Path, dst: Path, needle: str | None, mode: str, canary: str = "") -> tuple[list[str], list[str]]:
+    """Fill `dst` from `corpus`. mode: ablate (needle lines removed) | canary (intact, canary line appended to every
+    text file holding the needle) | empty (nothing copied). -> (text files that hold the needle, structured files that
+    mention it). Structured files (json / toml / yaml) are copied untouched: cutting a line out of a config can break
+    it, and a canary cannot be added; if the harness does read one as instructions the control then says "present"."""
     held: list[str] = []
+    left: list[str] = []
     if mode != "empty":
         for p in _walk(corpus):
             rel = p.relative_to(corpus)
@@ -120,22 +123,23 @@ def build(corpus: Path, dst: Path, needle: str | None, mode: str, canary: str = 
                 text = p.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 continue
-            holds = bool(needle) and needle.lower() in text.lower()
-            if holds:
-                held.append(rel.as_posix())
-                if mode == "ablate":
-                    text, _ = ablate_text(text, needle)
-                elif p.suffix.lower() in APPENDABLE:
-                    text = text.rstrip("\n") + f"\n\n- Reference token for this session: {canary}\n"
+            if bool(needle) and needle.lower() in text.lower():
+                if p.suffix.lower() in APPENDABLE or p.name in TEXT_NAMES:
+                    held.append(rel.as_posix())
+                    if mode == "ablate":
+                        text, _ = ablate_text(text, needle)
+                    else:
+                        text = text.rstrip("\n") + f"\n\n- Reference token for this session: {canary}\n"
                 else:
-                    raise Unavailable(f"{rel.as_posix()} is a structured file — a canary line cannot be added to it")
+                    left.append(rel.as_posix())
             out = dst / rel
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(text, encoding="utf-8", newline="")
         if mode in ("ablate", "canary") and not held:
-            raise Unavailable("the guarded line was not found in any instruction-like file under --corpus")
+            raise Unavailable(f"the guarded phrase appears only in structured files ({', '.join(left)}): a canary line cannot be planted there"
+                              if left else "the guarded line was not found in any instruction-like text file under --corpus")
     _git_init(dst, corpus)
-    return held
+    return held, left
 
 
 def probe_env(cwd: Path) -> dict:
@@ -147,6 +151,10 @@ def probe_env(cwd: Path) -> dict:
 
 def with_note(ask: str, on: bool) -> str:
     return ask + NO_TOOLS if on and NO_TOOLS.strip() not in ask else ask
+
+
+def _names(files: list[str], n: int = 3) -> str:
+    return ", ".join(files[:n]) + (f" (+{len(files) - n} more)" if len(files) > n else "")
 
 
 class Controller:
@@ -206,16 +214,17 @@ class Controller:
             return Control("unavailable", detail="no --corpus: nothing to copy")
         needle = self.needle_of(t)
         try:
-            copies, held = [], []
+            copies, held, left = [], [], []
             for _ in range(self.runs):   # one copy per sample: concurrent sessions never share a directory
                 d = self._dir()
-                held = build(self.corpus, d, needle, "ablate" if needle else "empty")
+                held, left = build(self.corpus, d, needle, "ablate" if needle else "empty")
                 copies.append(d)
         except Unavailable as e:
             return Control("unavailable", detail=str(e))
         except OSError as e:
             return Control("unavailable", detail=f"could not prepare the copy: {e}"[:160])
-        kind, what = (("line", f"without the line in {', '.join(held)}") if needle else ("project", "in an empty project"))
+        kind, what = (("line", f"without the line in {_names(held)}"
+                       + (f" (also mentioned in {_names(left)}, left as is)" if left else "")) if needle else ("project", "in an empty project"))
         ask = with_note(t["ask"], self.notools)
         with ThreadPoolExecutor(max_workers=len(copies) + 1) as pool:
             canary = pool.submit(self._canary_ok, harness, needle, held, timeout) if needle else None   # cached per file set

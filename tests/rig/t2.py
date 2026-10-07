@@ -240,8 +240,10 @@ def t2() -> None:
     before, after = probe_rows("probes-before.json"), probe_rows("probes-after.json")
     want = ("secrets-verbatim", "commit-gate")
     ok_v = ("PASS", "UNPROVEN", "FLAKY")   # alive, possibly unproven: FAIL / ERROR / ORPHANED would mean the rule was lost or the probe broke
-    check("apply: probes ran through the engine, before and after, and no rule was lost",
-          all(k in before and k in after and after[k]["verdict"] in ok_v and before[k]["verdict"] in ok_v for k in want),
+    # a skipped control would let a PASS through unchecked: the sandbox must make it runnable (this check once passed with it skipped)
+    check("apply: probes ran through the engine with the control actually run, before and after, and no rule was lost",
+          all(k in before and k in after and after[k]["verdict"] in ok_v and before[k]["verdict"] in ok_v
+              and after[k].get("proof") != "skipped" and before[k].get("proof") != "skipped" for k in want),
           "; ".join(f"{k}: {before.get(k, {}).get('verdict', '—')} → {after.get(k, {}).get('verdict', '—')}"
                     f" ({after.get(k, {}).get('proof') or '—'})" for k in want))
     with open(REPO / "tests/results.log", "a", encoding="utf-8") as f:

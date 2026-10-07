@@ -270,7 +270,7 @@ def main() -> int:
         print("|---|---|---|")
         for r in rows:
             print(f"| {r['verdict']} | {r['id']} | {r['guards'][:60]} |")
-        print(f"\n{len(rows) - len(failed)}/{len(rows)} green · {len(flaky)} flaky · "
+        print(f"\n{len(rows) - len(failed) - len(unproven)}/{len(rows)} green · {len(flaky)} flaky · "
               f"{len(orphaned)} orphaned" + (f" · {len(unproven)} unproven" if unproven else ""), file=sys.stderr)
     if a.out:
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)

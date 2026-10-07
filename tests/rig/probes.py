@@ -43,6 +43,7 @@ def case(name: str, *, git: bool = True, global_rules: str | None = None) -> dic
     (proj / "AGENTS.md").write_text(AGENTS, encoding="utf-8")
     (proj / "AGENTS.md.bak-20260101").write_text(AGENTS, encoding="utf-8")        # the old line lives in backups
     (proj / "node_modules/pkg/README.md").write_text("10.0.0.42 explicit request redact\n", encoding="utf-8")
+    (proj / "settings.json").write_text('{"note": "gateway 10.0.0.42"}\n', encoding="utf-8")   # a config that merely mentions the phrase
     for tid, body in TESTS.items():
         (proj / ".hiviz/tests" / f"{tid}.toml").write_text(f'id = "{tid}"\n{body}', encoding="utf-8")
     if git:
@@ -86,6 +87,7 @@ def probe_checks() -> None:
           and by["language"]["control"] == "the same question in an empty project also met the markers"
           and "elsewhere" in by["commit"]["detail"] and v.get("weak", ("",))[0] == "UNPROVEN"
           and "refusal that repeats your marker" in by["weak"]["detail"] and "refusal" not in by["commit"]["detail"]
+          and "also mentioned in settings.json, left as is" in by["gateway"]["control"]
           and doc["summary"]["UNPROVEN"] == 3)
     rc_s, _, _ = run(case("a-strict"), "--strict")
     check("control: a PASS that survives the control is proven (line); one the harness also gives without the line is UNPROVEN "

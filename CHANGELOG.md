@@ -51,6 +51,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver;
 - The installer prints symbols and a status table on a terminal. Piped output is unchanged.
 
 ### Fixed
+- Audit reports whose models wrap paths in backticks or bold (`` `/a/AGENTS.md:13` ``) lost every row in the HTML view,
+  the terminal summary and `apply/verify.py` (2 of 37 rows were read in a real run).
 - `uninstall` on **Node 16** reported files as removed and exited 0 while they stayed (`fs.rmSync` swallows `EACCES` there).
 - Windows: `C:\…` paths in reports, BOM-prefixed reports, UTF-8 output on legacy code pages.
 - `translate --format json` was accepted and silently printed text; it is now refused.

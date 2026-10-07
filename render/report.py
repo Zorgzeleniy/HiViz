@@ -313,9 +313,11 @@ def parse_rows(head: list[str], body: list[list[str]], sec: str) -> list[Row]:
                 b=int(digits) if digits else None, verb=verb, i=n)
         r.decision = g("decision")
         r.cat, r.ev, r.reason = split_why(r.why)
-        parts = [p.strip() for p in re.split(r"\s*⇄\s*", r.where)] if r.where else []
+        # models wrap paths in backticks / bold: `/a/AGENTS.md:13` ⇄ `/b/SKILL.md:9`
+        parts = [p.strip().strip("`*").strip() for p in re.split(r"\s*⇄\s*", r.where)] if r.where else []
+        r.where = parts[0] if parts else r.where
         if len(parts) == 2:
-            r.where, r.other = parts
+            r.other = parts[1]
         r.rest = r.reason
         m = re.search(r"(?:\bB\s*(?:says\s*)?:?|\bsays)\s*[`«\"](.+?)[`»\"]", r.reason)
         if m:
