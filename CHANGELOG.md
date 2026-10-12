@@ -15,7 +15,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver;
   tool calls counted only in terminal states (success/error — streamed intent is not a call);
   MCP tool names are `<server>_<tool>` (OpenCode's own sanitizer, not `mcp__*`); blame mines the
   `edit` / `write` / `patch` tools with the file path, model and session title from `session_v2`.
-  v1 installs with JSONL history keep working.
+- **T2 (the rig's end-to-end model runs) wired for Claude Code, Codex and pi** — previously only
+  omp and OpenCode. All three ride one ZAI key (bigmodel anthropic/openai facades, auto-exported
+  from the omp login), so no per-harness accounts are needed: `HIVIZ_T2_HARNESS=claude|codex|pi
+  python tests/run.py --t2x`. Codex runs the 0.50.0 line (npm alias `codex-t2`): current releases
+  dropped the chat wire API and bigmodel has no /responses.
 
 ### Changed
 - npm tarball ships the engines once (inside `plugin/`), not twice — `hiviz init` syncs
