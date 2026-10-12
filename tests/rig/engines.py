@@ -155,6 +155,32 @@ def engine_checks() -> None:
                                      ["zai/glm-test-model", "TOUCHED THIS LINE", "fixture plant"])
     check("blame: ledger + mined history + line-touch flag", b_ok,
           ((b.stdout or "").splitlines() or [""])[0][:100])
+    # OpenCode v2: sessions live in SQLite (session_message/session_v2), not JSONL
+    import sqlite3 as _sq
+    oc = fx / "opencode"
+    oc.mkdir()
+    con = _sq.connect(oc / "opencode.db")
+    con.execute("CREATE TABLE session_message (id text PRIMARY KEY, session_id text, type text, "
+                "seq integer, time_created integer, data text)")
+    con.execute("CREATE TABLE session_v2 (id text PRIMARY KEY, title text, directory text, model text)")
+    con.execute("INSERT INTO session_v2 VALUES ('s1','opencode: gateway fix',?,?)",
+                (str(REPO).replace("\\", "/"), '{"id":"oc-test-model","providerID":"opencode"}'))
+    _args = json.dumps({"path": str(REPO / "tests/fixture/agent/AGENTS.md").replace("\\", "/"),
+                        "oldString": "10.0.0.42 (legacy)", "newString": "10.0.0.99 (current)"})
+    con.execute("INSERT INTO session_message VALUES ('m1','s1','assistant',1,1770000000000,?)",
+                (json.dumps({"content": [
+                    {"type": "tool", "name": "edit", "state": {"status": "success", "input": _args}},
+                    {"type": "tool", "name": "write", "state": {"status": "running", "input": "{}"}}]}),))
+    con.commit()
+    con.close()
+    bo = sh([sys.executable, "blame/blame.py", "--file", "tests/fixture/agent/AGENTS.md",
+             "--marker", "10.0.0.42", "--sessions", str(oc)])
+    ol = [x for x in (bo.stdout or "").splitlines() if x.strip().startswith("- ")]
+    check("blame [opencode]: SQLite store mined (edit counted, streaming write not)",
+          bo.returncode == 0 and len(ol) == 1 and "oc-test-model" in ol[0]
+          and "opencode: gateway fix" in ol[0] and "TOUCHED THIS LINE" in ol[0],
+          ol[0].strip()[:110] if ol else (bo.stdout or bo.stderr).strip()[-110:])
+
     for h, model, session in [("claude", "claude-test-model", "claude: move gateway note"),
                               ("codex", "codex-test-model", "rollout-2026-09-05T10-00"),
                               ("pi", "testprov/pi-test-model", "pi: gateway fix")]:

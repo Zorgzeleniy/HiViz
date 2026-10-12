@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "render"))
@@ -35,10 +36,12 @@ def _env_dir(var: str, default: Path) -> Path:
 def default_sessions() -> list[Path]:
     home = Path.home()
     codex = _env_dir("CODEX_HOME", home / ".codex")
+    data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share")
     return [home / ".omp/agent/sessions", *sorted(home.glob(".omp/profiles/*/agent/sessions")),
             _env_dir("PI_CODING_AGENT_DIR", home / ".pi/agent") / "sessions",
             _env_dir("CLAUDE_CONFIG_DIR", home / ".claude") / "projects",
-            codex / "sessions", codex / "archived_sessions"]
+            codex / "sessions", codex / "archived_sessions",
+            data / "opencode"]   # JSONL history is gone in v2 (SQLite); kept for v1 installs
 
 
 def norm(p: str) -> str:
@@ -104,13 +107,80 @@ def _mentions(payload_norm: str, file_key: str, cwd: str) -> bool:
     return re.search(r"(?<![\w./-])" + re.escape(rel) + r"(?![\w.-])", payload_norm) is not None
 
 
+def mine_opencode(data: Path, file_key: str, marker: str, max_events: int = 50) -> list[dict]:
+    """Edit/write events from OpenCode's SQLite store (v2: no JSONL history).
+    Tools: `edit`/`write` carry the absolute `path` (+ old/new strings for edit);
+    `patch` carries `patchText` with `*** Update File: <path>` sections. Terminal
+    states only (success/error) — streamed intent is not an edit."""
+    import sqlite3
+    events: list[dict] = []
+    path_frag = file_key.rsplit("/", 1)[-1]
+    dbs = [Path(os.environ["OPENCODE_DB"])] if os.environ.get("OPENCODE_DB") and os.environ["OPENCODE_DB"] != ":memory:" \
+        else sorted(data.glob("opencode*.db")) if data.exists() else []
+    for db in dbs:
+        try:
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+        except sqlite3.Error:
+            continue
+        try:
+            rows = con.execute("SELECT sm.data, sm.time_created, s.title, s.directory, s.model "
+                               "FROM session_message sm LEFT JOIN session_v2 s ON s.id = sm.session_id "
+                               "WHERE sm.type='assistant'").fetchall()
+        except sqlite3.Error:
+            con.close()
+            continue
+        for data_json, t_ms, title, directory, model in rows:
+            try:
+                msg = json.loads(data_json)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            content = msg.get("content") if isinstance(msg, dict) else None
+            for item in content if isinstance(content, list) else []:
+                if not (isinstance(item, dict) and item.get("type") == "tool"
+                        and (item.get("state") or {}).get("status") in ("success", "error")):
+                    continue
+                tool = str(item.get("name", ""))
+                state = item.get("state") or {}
+                raw = str(state.get("input") or "")   # edit/write: args JSON; patch: raw patch text
+                if tool not in ("edit", "write", "patch") or not raw:
+                    continue
+                try:
+                    args = json.loads(raw) if tool != "patch" and raw.lstrip().startswith("{") else {}
+                except json.JSONDecodeError:
+                    args = {}
+                text = str(args.get("path") or "") or raw
+                if path_frag not in text.lower():
+                    continue
+                if not _mentions(norm(text), file_key, norm(directory or "")):
+                    continue
+                if isinstance(model, str) and model.lstrip().startswith("{"):
+                    try:
+                        model = json.loads(model)
+                    except json.JSONDecodeError:
+                        pass
+                model_info = model if isinstance(model, dict) else {}
+                events.append({
+                    "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime((t_ms or 0) / 1000)),
+                    "model": str(model_info.get("id") or "?"),
+                    "tool": tool,
+                    "session": title or "opencode session",
+                    "touched_line": bool(marker) and (marker in text or marker in raw
+                                                       or json.dumps(marker, ensure_ascii=False)[1:-1] in raw),
+                })
+        con.close()
+    events.sort(key=lambda e: e["ts"])
+    return events[:max_events]
+
+
 def mine_sessions(sessions_dirs: list[Path], file_key: str, marker: str,
                   max_events: int = 50) -> list[dict]:
     """Return edit/write events touching the file (marker-flagged when payload
-    contains the line text), newest last."""
-    events: list[dict] = []
+    contains the line text), newest last. JSONL harnesses + OpenCode SQLite."""
+    data_dir = next((d for d in sessions_dirs if d.is_dir() and list(d.glob("opencode*.db"))), None)
+    jsonl_dirs = [d for d in sessions_dirs if d is not data_dir]
+    events = mine_opencode(data_dir, file_key, marker, max_events) if data_dir else []
     files: list[Path] = []
-    for d in sessions_dirs:
+    for d in jsonl_dirs:
         if d.exists():
             files.extend(sorted(d.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime,
                                 reverse=True))

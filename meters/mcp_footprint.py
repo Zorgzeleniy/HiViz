@@ -20,6 +20,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -345,13 +346,16 @@ def measure_sync(name: str, cfg: dict, timeout: float) -> dict:
 
 
 def session_sources(explicit: list[str] | None) -> dict[str, list[Path]]:
-    """Session-log dirs per harness family. Cursor/Windsurf/OpenCode keep no JSONL logs we can mine."""
+    """Session-log sources per harness family. Cursor/Windsurf keep no minable logs.
+    OpenCode stores sessions in SQLite (see mine_opencode)."""
     if explicit:
         return {"*": [Path(p) for p in explicit]}
+    data = Path(os.environ.get("XDG_DATA_HOME") or HOME / ".local" / "share")
     return {
         "omp": [HOME / ".omp/agent/sessions", *sorted(HOME.glob(".omp/profiles/*/agent/sessions"))],
         "claude": [CLAUDE_DIR / "projects"],
         "codex": [CODEX_DIR / "sessions", CODEX_DIR / "archived_sessions"],
+        "opencode": [data / "opencode"],
     }
 
 
@@ -393,6 +397,15 @@ def mine_usage(server_names: list[str], sources: dict[str, list[Path]]) -> tuple
             c[1] = ts
 
     for family, dirs in sources.items():
+        if family == "opencode":
+            oc = mine_opencode(dirs[0], server_names)
+            if any(v["calls"] for v in oc.values()):
+                mined.add(family)
+            for name, u in oc.items():
+                out[name]["calls"] += u["calls"]
+                if u["last_used"] and (out[name]["last_used"] is None or u["last_used"] > out[name]["last_used"]):
+                    out[name]["last_used"] = u["last_used"]
+            continue
         for d in dirs:
             if not d.exists():
                 continue
@@ -430,6 +443,58 @@ def mine_usage(server_names: list[str], sources: dict[str, list[Path]]) -> tuple
                     if lu and (out[name]["last_used"] is None or lu > out[name]["last_used"]):
                         out[name]["last_used"] = lu
     return out, mined
+
+
+def _oc_namespace(server: str) -> str:
+    """OpenCode names MCP tools `<sanitized server>_<sanitized tool>` (core/src/tool/mcp.ts)."""
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", server)
+
+
+def mine_opencode(data: Path, server_names: list[str]) -> dict[str, dict]:
+    """Usage from OpenCode's SQLite session store (read-only, WAL-safe).
+
+    Databases: `opencode[-<channel>].db` under the data dir (OPENCODE_DB names another path).
+    Messages live in `session_message` rows `type='assistant'` whose `data` JSON holds
+    `content[]: {type: 'tool', name, state: {status: running|success|error}}` — a call
+    only counts with a terminal state (executed tools, not streamed intent)."""
+    import sqlite3
+    out = {n: {"calls": 0, "last_used": None} for n in server_names}
+    prefixes = {n: _oc_namespace(n) + "_" for n in server_names}
+    dbs = [Path(os.environ["OPENCODE_DB"])] if os.environ.get("OPENCODE_DB") and os.environ["OPENCODE_DB"] != ":memory:" \
+        else sorted(data.glob("opencode*.db"))
+    for db in dbs:
+        try:
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+        except sqlite3.Error:
+            continue
+        try:
+            rows = con.execute(
+                "SELECT data, time_created FROM session_message WHERE type='assistant'").fetchall()
+        except sqlite3.Error:
+            con.close()
+            continue
+        for data_json, t_ms in rows:
+            try:
+                msg = json.loads(data_json)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            content = msg.get("content") if isinstance(msg, dict) else None
+            for item in content if isinstance(content, list) else []:
+                if not (isinstance(item, dict) and item.get("type") == "tool"):
+                    continue
+                state = item.get("state") or {}
+                if state.get("status") not in ("success", "error"):   # ran to completion (or failed after running)
+                    continue
+                name = str(item.get("name", ""))
+                for srv, pref in prefixes.items():
+                    if name.startswith(pref):
+                        out[srv]["calls"] += 1
+                        ts = time.strftime("%Y-%m-%d", time.gmtime((t_ms or 0) / 1000))
+                        if not out[srv]["last_used"] or ts > out[srv]["last_used"]:
+                            out[srv]["last_used"] = ts
+                        break
+        con.close()
+    return out
 
 
 def main() -> int:
