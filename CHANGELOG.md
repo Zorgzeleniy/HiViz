@@ -2,6 +2,27 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver; below 1.0 a minor bump may change behavior.
 
+
+## Unreleased
+
+### Added
+- `hiviz status` shows a **probe CLI** column (`probesReady` in JSON): whether a headless agent CLI is on
+  PATH, so /hv-test's constitution probes are known to work (or known to ERROR) before you run them.
+  Windsurf reports `no headless CLI` — its successor CLI (Devin) reads `AGENTS.md`, not `.windsurf/rules/`,
+  so probing through it would fail live rules; documented in `core/TESTS.md`.
+- `hiviz init` ends with a **first-step hint**: run /hv-audit in a project — report.md and report.html
+  land in `.hiviz/`, you decide, then /hv-apply; plus a note when no probe CLI is on PATH.
+
+### Changed
+- npm tarball ships the engines once (inside `plugin/`), not twice — `hiviz init` syncs
+  `~/.hiviz/engines` from `plugin/engines` (tarball) or the top-level dirs (a checkout). Tarball −46%.
+- Bench configs share the vendored skill trees via `meta.toml` `skills = [...]` instead of one frozen
+  copy per config (identical bytes; run records keep the byte counts). Working tree of `bench/configs` −95%.
+- Windows fixes in the probe control: `$PWD` now points at the control copy on every OS (a Git Bash /
+  test-rig `PWD` inherited by the probe made it read the real project instead of the ablated copy —
+  verdicts were wrongly UNPROVEN); temp copies are actually removed (`git init` makes loose objects
+  read-only; Windows refuses to unlink them).
+
 ## 0.8.0 — 2026-10-07
 
 ### Added
