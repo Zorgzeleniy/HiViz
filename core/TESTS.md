@@ -17,6 +17,11 @@ command template with `{ask}`; pass the harness you are running in. Default `aut
 `$HIVIZ_HARNESS`, then Claude Code when `$CLAUDECODE` is set, then the first CLI found
 on PATH. The ask is passed as one argument, never through a shell.
 
+Windsurf has no probe CLI: its headless successor is the Devin CLI (`devin -p`), which reads
+`AGENTS.md` but not `.windsurf/rules/` — probing through it would FAIL live rules, so `hiviz status`
+reports `no headless CLI` for Windsurf instead of silently using the wrong one. Drift, meters, blame
+and translate work for Windsurf; only constitution probes need a headless harness.
+
 Verdicts: `PASS` · `FAIL` (markers absent from the answer — the rule stopped
 binding) · `UNPROVEN` (markers present, but the same question asked WITHOUT the rule's line was answered just as well —
 see "The negative control") · `FLAKY` (failed once, passed on retry — reported, does not fail CI)

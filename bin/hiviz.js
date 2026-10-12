@@ -76,6 +76,29 @@ function commandSet(T = templates()) {
   ];
 }
 
+// Probe CLIs the constitution engine can drive headlessly (`HARNESSES` in constitution/run.py).
+// Windsurf has none: its successor CLI is Devin (`devin -p`, reads AGENTS.md only, not .windsurf/rules/)
+// — a probe through it would FAIL rules that are live, so it is reported as "no headless CLI" instead.
+const PROBE_CLIS = { claude: "claude", codex: "codex", omp: "omp", pi: "pi", cursor: "cursor-agent", opencode: "opencode" };
+
+// A probe CLI is usable when its executable resolves on PATH (PATHEXT aware on Windows).
+function which(cli) {
+  const exts = process.platform === "win32" ? (process.env.PATHEXT || ".exe;.cmd;.bat").split(";") : [""];
+  for (const dir of (process.env.PATH || "").split(path.delimiter).filter(Boolean)) {
+    for (const ext of exts) {
+      if (fs.existsSync(path.join(dir, cli + ext))) return path.join(dir, cli + ext);
+    }
+  }
+  return null;
+}
+
+function probeCell(h) {
+  const cli = PROBE_CLIS[h.id];
+  if (!cli) return { text: "no headless CLI", style: ["gray"] };
+  const ok = Boolean(which(cli));
+  return { text: ok ? cli : `${cli} not found`, style: [ok ? "green" : "yellow"] };
+}
+
 function harnesses() {
   const T = templates();
   const skills = (root) => skillSet(T).map(([name, content]) => [path.join(root, name, "SKILL.md"), content]);
@@ -329,32 +352,40 @@ function status() {
     const inst = h.targets.every(([p]) => fs.existsSync(p));
     const plug = Boolean(plugins[h.id]);
     const adapter = !det ? "n/a" : inst ? "INSTALLED" : plug ? "not needed" : "missing (run: hiviz init)";
-    return { h, det, plug, adapter };
+    const probe = probeCell(h);
+    return { h, det, plug, adapter, probe };
   });
+  const probeReady = rows.some((r) => PROBE_CLIS[r.h.id] && which(PROBE_CLIS[r.h.id]));
   if (FMT === "json") {
     console.log(JSON.stringify({
-      harnesses: rows.map((r) => ({ harness: r.h.name, id: r.h.id, detected: r.det, adapter: r.adapter, plugin: r.plug })),
+      harnesses: rows.map((r) => ({ harness: r.h.name, id: r.h.id, detected: r.det, adapter: r.adapter,
+        plugin: r.plug, probe: { cli: r.probe.text, ready: PROBE_CLIS[r.h.id] && which(PROBE_CLIS[r.h.id]) } })),
       legacyAdapters: legacy,
+      probesReady: probeReady,
     }, null, 2));
     return;
   }
+  const note = probeReady ? "" : "  ! no probe CLI on PATH — constitution tests (/hv-test) would ERROR; audit/drift/meters/blame work without one";
   if (FMT === "pretty") {
     say("");
     console.log(paint("hiviz status", "bold") + paint("  harnesses on this machine", "gray"));
-    console.log(table(["harness", "detected", "adapter"], rows.map((r) => [
+    console.log(table(["harness", "detected", "adapter", "probe CLI"], rows.map((r) => [
       { text: r.h.name },
       { text: r.det ? "detected" : "not found", style: [r.det ? "green" : "gray"] },
       { text: r.adapter + (r.plug ? " · plugin INSTALLED" : ""),
         style: [r.adapter === "INSTALLED" || r.adapter === "not needed" ? "green" : r.adapter === "n/a" ? "gray" : "yellow"] },
+      r.probe,
     ])));
     if (legacy) say(`  ! legacy adapters from an older hiviz: ${legacy} (run: hiviz init to migrate)`);
+    if (note) say(note);
     return;
   }
   say("Harnesses on this machine:");
   for (const r of rows) {
-    say(`  ${r.h.name.padEnd(12)} ${r.det ? "detected" : "not found"} · adapter ${r.adapter}${r.plug ? " · plugin INSTALLED" : ""}`);
+    say(`  ${r.h.name.padEnd(12)} ${r.det ? "detected" : "not found"} · adapter ${r.adapter}${r.plug ? " · plugin INSTALLED" : ""} · probes: ${r.probe.text}`);
   }
   if (legacy) say(`  legacy adapters from an older hiviz: ${legacy} (run: hiviz init to migrate)`);
+  if (note) say(note);
 }
 
 function install(dry) {
@@ -395,11 +426,17 @@ function install(dry) {
   }
   removeLegacy(dry, say);
   installEngines(dry);
-  if (!dry) say(
-    "\nDone. Commands (Claude Code / OpenCode): /hv-audit, /hv-apply, /hv-drift, /hv-test, /hv-blame, /hv-translate.\n" +
-    "Skills (Codex / omp / pi / Cursor / Windsurf / OpenCode): hv-audit, hv-apply, hv-drift, hv-constitution, hv-blame, hv-translate —\n" +
-    "invoke by name or just ask \"audit my prompt debt\" / \"check instruction drift\" / \"blame this line\".\n" +
-    "Python engines: ~/.hiviz/engines");
+  if (!dry) {
+    const probeAny = harnesses().some((h) => PROBE_CLIS[h.id] && which(PROBE_CLIS[h.id]));
+    say(
+      "\nDone. Commands (Claude Code / OpenCode): /hv-audit, /hv-apply, /hv-drift, /hv-test, /hv-blame, /hv-translate.\n" +
+      "Skills (Codex / omp / pi / Cursor / Windsurf / OpenCode): hv-audit, hv-apply, hv-drift, hv-constitution, hv-blame, hv-translate —\n" +
+      "invoke by name or just ask \"audit my prompt debt\" / \"check instruction drift\" / \"blame this line\".\n" +
+      "Python engines: ~/.hiviz/engines\n\n" +
+      "First step: open your agent in a project and run /hv-audit (or ask it to \"audit my prompt debt\") —\n" +
+      "it writes .hiviz/report.md and report.html; you decide, then /hv-apply." +
+      (probeAny ? "" : "\nNote: no probe CLI on PATH — /hv-test (constitution probes) needs one; audit/drift/meters/blame work without."));
+  }
 }
 
 function uninstall(dry) {
