@@ -10,8 +10,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver;
   PATH, so /hv-test's constitution probes are known to work (or known to ERROR) before you run them.
   Windsurf reports `no headless CLI` — its successor CLI (Devin) reads `AGENTS.md`, not `.windsurf/rules/`,
   so probing through it would fail live rules; documented in `core/TESTS.md`.
-- `hiviz init` ends with a **first-step hint**: run /hv-audit in a project — report.md and report.html
-  land in `.hiviz/`, you decide, then /hv-apply; plus a note when no probe CLI is on PATH.
+- **OpenCode session mining** (meters usage + blame history): OpenCode v2 keeps sessions in
+  SQLite (`~/.local/share/opencode/opencode[-<channel>].db`), not JSONL. Read-only connections;
+  tool calls counted only in terminal states (success/error — streamed intent is not a call);
+  MCP tool names are `<server>_<tool>` (OpenCode's own sanitizer, not `mcp__*`); blame mines the
+  `edit` / `write` / `patch` tools with the file path, model and session title from `session_v2`.
+  v1 installs with JSONL history keep working.
 
 ### Changed
 - npm tarball ships the engines once (inside `plugin/`), not twice — `hiviz init` syncs

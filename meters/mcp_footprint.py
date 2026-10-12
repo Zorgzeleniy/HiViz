@@ -5,7 +5,7 @@ For every MCP server in the discovered harness configs (Claude Code, Codex, omp,
 Cursor, Windsurf, OpenCode — pi has no MCP by design):
   - measures the standing context payload (initialize + tools/list →
     names + descriptions + inputSchemas) — what EVERY session pays;
-  - mines harness session logs (omp, Claude Code, Codex) for actual invocations,
+  - mines harness session logs (omp, Claude Code, Codex, OpenCode) for actual invocations,
     so "weight" and "usage" sit in one row: pay-vs-use. calls=null means usage is
     unknown (no minable logs for the harnesses that load the server), not zero.
 

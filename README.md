@@ -232,7 +232,7 @@ Fourteen tools, 1,430 tokens, every single session, zero invocations ever. That 
 | `/hv-translate`               | migrate the corpus between harnesses (any of the 7 ↔ any), probe-checked equivalence            |
 | `/hv-blame`                   | provenance for any instruction line: ledger + session-log mining — who wrote it, when, why      |
 
-Claude Code and OpenCode get them as slash commands; Codex, omp, pi, Cursor and Windsurf as skills that wake when you ask (*"audit my prompt debt"*), never on their own. Blame and MCP usage mine the session logs of omp, pi, Claude Code and Codex. Details: [docs/install.md](./docs/install.md).
+Claude Code and OpenCode get them as slash commands; Codex, omp, pi, Cursor and Windsurf as skills that wake when you ask (*"audit my prompt debt"*), never on their own. Blame and MCP usage mine the session logs of omp, pi, Claude Code, Codex and OpenCode (its SQLite store). Details: [docs/install.md](./docs/install.md).
 
 ### Where things live
 
