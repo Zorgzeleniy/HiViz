@@ -308,7 +308,11 @@ function table(headers, rows) {
 function installEngines(dry) {
   let wrote = 0, removed = 0;
   for (const dir of ENGINE_DIRS) {
-    const r = syncTree(path.join(ROOT, dir), path.join(ENGINES, dir), dry);
+    // The npm tarball ships the engines only inside plugin/ (files in package.json); a checkout has both.
+    // core/ is not mirrored into plugin/engines (the skills embed the procedures), so it always comes from ROOT.
+    const src = dir === "core" || !fs.existsSync(path.join(ROOT, "plugin", "engines", dir))
+      ? path.join(ROOT, dir) : path.join(ROOT, "plugin", "engines", dir);
+    const r = syncTree(src, path.join(ENGINES, dir), dry);
     wrote += r.wrote; removed += r.removed;
   }
   const mark = wrote + removed === 0 ? "=" : dry ? "~" : "+";

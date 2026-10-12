@@ -29,7 +29,21 @@ def sh(cmd: list[str], cwd=None, timeout=2400, env=None):
 
 
 def skill_sources(corpus: Path) -> list[Path]:
+    """Local *skills* dirs plus any the config's meta.toml points at via `skills = [...]` (shared vendor trees —
+    kept deduplicated instead of one frozen copy per config; bytes are what the run records)."""
     dirs = set(corpus.glob("*skills*")) | set(corpus.glob("superpowers*")) | set(corpus.glob("*skills*/skills"))
+    meta = corpus.parent / "meta.toml"
+    if meta.exists():
+        try:
+            import tomllib
+            for s in tomllib.loads(meta.read_text(encoding="utf-8")).get("skills", []):
+                d = (BENCH / s).resolve() if not Path(s).is_absolute() else Path(s)
+                if d.is_dir():
+                    dirs.add(d)
+                else:
+                    sys.exit(f"meta.toml skills path not found: {s}")
+        except ImportError:
+            pass
     return sorted(d for d in dirs if d.is_dir())
 
 

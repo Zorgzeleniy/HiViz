@@ -232,8 +232,7 @@ def _pad(text: str, w: int, align: str) -> str:
 
 
 def table(headers: list[str], rows: list[list], align: list[str] | None = None,
-          status_col: int | None = None, dim_cols: tuple[int, ...] = (),
-          max_width: int | None = None) -> str:
+          status_col: int | None = None, dim_cols: tuple[int, ...] = ()) -> str:
     """Box table; cells are plain strings (styled here). Wide columns wrap to fit the terminal."""
     n = len(headers)
     align = align or ["l"] * n
@@ -241,7 +240,7 @@ def table(headers: list[str], rows: list[list], align: list[str] | None = None,
     body = [[str(c) for c in r] for r in rows]
     natural = [max([width(headers[i])] + [width(r[i]) + (2 if i == status_col else 0) for r in body])
                for i in range(n)]
-    avail = (max_width or term_cols()) - (3 * n + 1)
+    avail = term_cols() - (3 * n + 1)
     widths = natural[:]
     floor = [max(width(headers[i]), 10) for i in range(n)]
     if status_col is not None:

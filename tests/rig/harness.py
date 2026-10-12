@@ -184,8 +184,6 @@ HARNESSES: dict[str, Harness] = {h.name: h for h in (
     Harness("claude", "claude", discover=_claude, commands=True, skills_dir=".claude/skills"),
     Harness("codex", "codex", discover=_codex, skills_dir=".agents/skills"),
     Harness("pi", "pi", discover=_pi, skills_dir=".agents/skills"),
-    Harness("cursor", "cursor-agent"),
-    Harness("windsurf", "windsurf"),
 )}
 
 

@@ -3,3 +3,4 @@ origin = "ChatGPTBox CLAUDE.md (ChatGPTBox-dev/chatGPTBox, MIT, ~11k stars; snap
 url = "https://github.com/ChatGPTBox-dev/chatGPTBox"
 source = "doi.org/10.5281/zenodo.20600327 (dataset snapshot)"
 description = "Reworked first config: ALWAYS-block rot + env-var dump + manual-test walkthroughs; skills = superpowers + caveman + ponytail (no anthropics, no no-ai-slop)"
+skills = ["../tests/fixture/vendor/superpowers/skills", "vendor/viral-skills"]

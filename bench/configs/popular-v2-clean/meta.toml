@@ -1,0 +1,6 @@
+name = "popular-v2-clean"
+origin = "popular-v2 after one hiviz audit+apply (frozen diff): CLAUDE.md 15,509 -> 3,638 B; skills identical to arm A — the cleanup only rewrote the standing file"
+url = "https://github.com/ChatGPTBox-dev/chatGPTBox"
+source = "doi.org/10.5281/zenodo.20600327 (dataset snapshot)"
+description = "Clean arm of popular-v2; probes-after evidence in .hiviz/"
+skills = ["../tests/fixture/vendor/superpowers/skills", "vendor/viral-skills"]

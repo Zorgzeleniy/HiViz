@@ -44,6 +44,11 @@ in configs/ for the frozen historical runs.
 ```
 bench/
   tasks/<name>/{task.md, verify.py, fixtures/}
-  configs/<name>/{corpus/ (AGENTS.md/CLAUDE.md + skills/), meta.toml, qa.json, conventions.json}
-  run_ab.py   # profile setup + headless runs + verification + metrics + table
+  configs/<name>/{corpus/ (standing file + config-specific skills/), meta.toml, qa.json, conventions.json}
+  vendor/             # config-shared skill trees (viral-skills/…), one copy
+  run_ab.py           # profile setup + headless runs + verification + metrics + table
 ```
+
+Shared skill trees (superpowers via `tests/fixture/vendor/`, viral via `bench/vendor/`) are referenced
+from a config's `meta.toml` (`skills = [...]`, paths relative to `bench/`) instead of being copied
+into every config — identical bytes, one tree; run records keep the byte counts, not the copies.
