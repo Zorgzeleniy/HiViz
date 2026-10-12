@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import secrets
 import shutil
 import subprocess
@@ -144,9 +145,8 @@ def build(corpus: Path, dst: Path, needle: str | None, mode: str, canary: str = 
 
 def probe_env(cwd: Path) -> dict:
     env = dict(os.environ)
-    if os.name != "nt":
-        env["PWD"] = str(cwd)   # Bun/Node-based harnesses read their working directory from here
-    return env
+    env["PWD"] = str(cwd)   # $PWD must point at the copy on every OS: Windows shells (Git Bash, test rigs) set it
+    return env              # too, and an inherited one points the harness at the ORIGINAL project
 
 
 def with_note(ask: str, on: bool) -> str:
@@ -175,7 +175,14 @@ class Controller:
 
     def close(self) -> None:
         for d in self._tmp:
-            shutil.rmtree(d, ignore_errors=True)
+            # git init in the copy makes loose objects 0444; Windows refuses to unlink read-only files
+            def _rw(func, path, _exc):  # noqa: ANN001
+                try:
+                    os.chmod(path, stat.S_IWRITE)
+                    func(path)
+                except OSError:
+                    pass
+            shutil.rmtree(d, onerror=_rw)
         self._tmp.clear()
 
     def _dir(self) -> Path:
