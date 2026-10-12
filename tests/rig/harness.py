@@ -157,8 +157,8 @@ def _omp(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
 # ---- model runs
 # All three ride the maintainer's ZAI (bigmodel.cn) subscription key: no per-harness account is needed.
 # CLAUDE_T2_KEY / ZAI_API_KEY name the env var the rig exports from the omp stored login (t2.py).
-ZAI_ANTHROPIC_URL = "https://open.bigmodel.cn/api/anthropic"   # anthropic-compatible facade
-ZAI_OPENAI_URL = "https://open.bigmodel.cn/api/paas/v4"        # openai-compatible facade
+ZAI_ANTHROPIC_URL = "https://api.z.ai/api/anthropic"   # anthropic-compatible facade (open.bigmodel.cn resets connections here)
+ZAI_OPENAI_URL = "https://api.z.ai/api/coding/paas/v4"        # openai-compatible facade (omp zai provider route)
 
 
 def _omp_run(prompt: str, sandbox: Path, model: str) -> list[str]:

@@ -96,7 +96,7 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
     if h.name == "pi":   # pi needs its provider registry pointed at ZAI inside the sandbox
         (prof / ".pi-agent").mkdir(exist_ok=True)
         (prof / ".pi-agent/models.yml").write_text(
-            "providers:\n  zai:\n    baseUrl: https://open.bigmodel.cn/api/paas/v4\n"
+            "providers:\n  zai:\n    baseUrl: https://api.z.ai/api/coding/paas/v4\n"
             "    api: openai-completions\n    apiKey: ZAI_API_KEY\n"
             "    models:\n      - id: glm-5.3-flash\n        name: GLM 5.3 Flash\n"
             "        contextWindow: 128000\n        maxTokens: 8192\n", encoding="utf-8")
@@ -106,7 +106,7 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         (prof / ".codex/config.toml").write_text(
             'model = "glm-5.3-flash"\nmodel_provider = "zai"\n\n'
             "[model_providers.zai]\nname = \"zai\"\n"
-            "base_url = \"https://open.bigmodel.cn/api/paas/v4\"\n"
+            "base_url = \"https://api.z.ai/api/coding/paas/v4\"\n"
             "env_key = \"ZAI_API_KEY\"\nwire_api = \"chat\"\n\n"
             'sandbox_mode = "danger-full-access"\n', encoding="utf-8")
     (prof / "config.yml").write_text(
