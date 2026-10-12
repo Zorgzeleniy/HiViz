@@ -154,13 +154,39 @@ def _omp(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
         j.close()
 
 
-# ---- model runs (only what has been run end to end)
+# ---- model runs
+# All three ride the maintainer's ZAI (bigmodel.cn) subscription key: no per-harness account is needed.
+# CLAUDE_T2_KEY / ZAI_API_KEY name the env var the rig exports from the omp stored login (t2.py).
+ZAI_ANTHROPIC_URL = "https://open.bigmodel.cn/api/anthropic"   # anthropic-compatible facade
+ZAI_OPENAI_URL = "https://open.bigmodel.cn/api/paas/v4"        # openai-compatible facade
+
+
 def _omp_run(prompt: str, sandbox: Path, model: str) -> list[str]:
     return ["omp", "--profile", OMP_PROFILE, "-p", prompt]
 
 
 def _opencode_run(prompt: str, sandbox: Path, model: str) -> list[str]:
     return ["opencode", "run", "-m", model, "--dir", str(sandbox), "--auto", prompt]
+
+
+def _claude_run(prompt: str, sandbox: Path, model: str) -> list[str]:
+    return ["claude", "-p", prompt, "--model", model, "--no-session-persistence",
+            "--permission-mode", "bypassPermissions"]
+
+
+def _codex_run(prompt: str, sandbox: Path, model: str) -> list[str]:
+    # Codex >= 0.106 dropped `wire_api = "chat"` (discussions/7782) and bigmodel has no /responses:
+    # T2 rides the 0.50.0 line, installed beside the current one as the npm alias `codex-t2`
+    # (`npm i -g codex-t2@npm:@openai/codex@0.50.0`) so T1 discovery keeps testing the current CLI.
+    t2 = Path.home() / "AppData/Roaming/npm/node_modules/codex-t2/bin/codex.js" if os.name == "nt" \
+        else Path.home() / ".npm-global/lib/node_modules/codex-t2/bin/codex.js"
+    if t2.exists():
+        return ["node", str(t2), "exec", "--skip-git-repo-check", "-c", f"model={model}", prompt]
+    return ["codex", "exec", "--skip-git-repo-check", "-c", f"model={model}", prompt]
+
+
+def _pi_run(prompt: str, sandbox: Path, model: str) -> list[str]:
+    return ["pi", "-p", "--model", model, prompt]
 
 
 @dataclass(frozen=True)
@@ -174,6 +200,26 @@ class Harness:
     profile: str | None = None                                 # isolated profile the T2 sandbox lives in (omp)
     sandbox_dir: Callable[[Path, Path], Path] | None = None    # (fake home, project) -> where the T2 sandbox is built
     extras: dict[str, str] = field(default_factory=dict)       # extra sandbox files the harness needs
+    run_env: Callable[[Path, str], dict[str, str]] | None = None  # (sandbox, model) -> env vars for model runs
+
+
+def _zai_key() -> str:
+    return os.environ.get("CLAUDE_T2_KEY") or os.environ.get("ZAI_API_KEY") or ""
+
+
+def _claude_env(sandbox: Path, model: str) -> dict[str, str]:
+    # No CLAUDE_CONFIG_DIR: the login lives in the real ~/.claude; skills come from <cwd>/.claude/skills
+    # (profile_setup symlinks it). Window enforcement off: glm models are not in claude's catalog.
+    return {"ANTHROPIC_BASE_URL": ZAI_ANTHROPIC_URL, "ANTHROPIC_AUTH_TOKEN": _zai_key(), "ANTHROPIC_API_KEY": "",
+            "ANTHROPIC_MODEL": model, "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT": "1"}
+
+
+def _codex_env(sandbox: Path, model: str) -> dict[str, str]:
+    return {"CODEX_HOME": str(sandbox / ".codex"), "ZAI_API_KEY": _zai_key()}
+
+
+def _pi_env(sandbox: Path, model: str) -> dict[str, str]:
+    return {"PI_CODING_AGENT_DIR": str(sandbox / ".pi-agent"), "ZAI_API_KEY": _zai_key()}
 
 
 HARNESSES: dict[str, Harness] = {h.name: h for h in (
@@ -181,9 +227,10 @@ HARNESSES: dict[str, Harness] = {h.name: h for h in (
             sandbox_dir=lambda home, project: home / ".omp/profiles" / OMP_PROFILE / "agent"),
     Harness("opencode", "opencode", discover=_opencode, argv=_opencode_run, skills_dir=".agents/skills",
             extras={"opencode.json": '{"instructions": ["RULES.md"]}\n'}),
-    Harness("claude", "claude", discover=_claude, commands=True, skills_dir=".claude/skills"),
-    Harness("codex", "codex", discover=_codex, skills_dir=".agents/skills"),
-    Harness("pi", "pi", discover=_pi, skills_dir=".agents/skills"),
+    Harness("claude", "claude", discover=_claude, argv=_claude_run, run_env=_claude_env, commands=True,
+            skills_dir=".claude/skills"),
+    Harness("codex", "codex", discover=_codex, argv=_codex_run, run_env=_codex_env, skills_dir=".agents/skills"),
+    Harness("pi", "pi", discover=_pi, argv=_pi_run, run_env=_pi_env, skills_dir=".agents/skills"),
 )}
 
 

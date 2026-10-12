@@ -18,10 +18,16 @@ from .core import GT, engine_dirs, HOME, OUT, REPO, RESULTS, _SECTION, browser_e
 PROFILE = HOME / ".omp/profiles/hiviz-test/agent"
 
 
-T2_HARNESS = os.environ.get("HIVIZ_T2_HARNESS", "omp")  # omp | opencode
+T2_HARNESS = os.environ.get("HIVIZ_T2_HARNESS", "omp")  # omp | opencode | claude | codex | pi
 
-
-T2_MODEL = os.environ.get("HIVIZ_T2_MODEL", "opencode/big-pickle")  # opencode only
+# claude/codex/pi ride the maintainer's ZAI key (bigmodel.cn facades): one key, three harnesses,
+# no per-harness accounts. ZAI_API_KEY or CLAUDE_T2_KEY must be set; omp needs none (stored login).
+T2_MODEL = os.environ.get("HIVIZ_T2_MODEL") or {
+    "opencode": "opencode/big-pickle",   # free, no key
+    "claude": "glm-5.3-flash",
+    "codex": "glm-5.3-flash",
+    "pi": "zai/glm-5.3-flash",
+}.get(T2_HARNESS, "zai/glm-5.3-flash:high")
 
 
 def adapter() -> Harness:
@@ -32,6 +38,12 @@ def adapter() -> Harness:
                  "in tests/rig/harness.py an argv — RUNBOOK, 'Adding a harness to T2'. Its skill discovery is already "
                  "checked against the real CLI in T1, without a model.")
     return h
+
+
+def agent_env() -> dict[str, str]:
+    """Env vars the adapter needs for model runs (claude/pi/codex ride the ZAI key)."""
+    h = adapter()
+    return h.run_env(PROFILE, T2_MODEL) if h.run_env else {}
 
 
 def agent_cmd(prompt: str) -> list[str]:
@@ -81,6 +93,22 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         (link.parent / "engines").symlink_to(os.path.relpath(prof / "engines", link.parent), target_is_directory=True)
         for rel, text in h.extras.items():   # e.g. opencode must be told to load RULES.md so the safety probes can quote it
             (prof / rel).write_text(text, encoding="utf-8")
+    if h.name == "pi":   # pi needs its provider registry pointed at ZAI inside the sandbox
+        (prof / ".pi-agent").mkdir(exist_ok=True)
+        (prof / ".pi-agent/models.yml").write_text(
+            "providers:\n  zai:\n    baseUrl: https://open.bigmodel.cn/api/paas/v4\n"
+            "    api: openai-completions\n    apiKey: ZAI_API_KEY\n"
+            "    models:\n      - id: glm-5.3-flash\n        name: GLM 5.3 Flash\n"
+            "        contextWindow: 128000\n        maxTokens: 8192\n", encoding="utf-8")
+    if h.name == "codex":   # codex config: ZAI provider on chat wire (0.50 pin — see harness.py);
+        # danger-full-access: apply starts nested headless probes from inside codex's own sandbox
+        (prof / ".codex").mkdir(exist_ok=True)
+        (prof / ".codex/config.toml").write_text(
+            'model = "glm-5.3-flash"\nmodel_provider = "zai"\n\n'
+            "[model_providers.zai]\nname = \"zai\"\n"
+            "base_url = \"https://open.bigmodel.cn/api/paas/v4\"\n"
+            "env_key = \"ZAI_API_KEY\"\nwire_api = \"chat\"\n\n"
+            'sandbox_mode = "danger-full-access"\n', encoding="utf-8")
     (prof / "config.yml").write_text(
         "modelRoles:\n  default: zai/glm-5.3-flash:high\nmemory:\n  backend: local\n"
         "skills:\n  customDirectories:\n    - " + str(prof / "skills").replace("\\", "/") + "\n",
@@ -147,6 +175,20 @@ def t2() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     o = OUT.as_posix()
     profile_setup()
+    if T2_HARNESS in ("claude", "codex", "pi") and not (os.environ.get("ZAI_API_KEY") or os.environ.get("CLAUDE_T2_KEY")):
+        # no ZAI key in the env: take the newest one from the omp stored login (the maintainer's machine)
+        import sqlite3
+        try:
+            con = sqlite3.connect(f"file:{HOME / '.omp/agent/agent.db'}?mode=ro", uri=True)
+            k = con.execute("SELECT json_extract(data,'$.key') FROM auth_credentials "
+                            "WHERE provider='zai' ORDER BY updated_at DESC LIMIT 1").fetchone()
+            con.close()
+        except sqlite3.Error:
+            k = None
+        if not k or not k[0]:
+            sys.exit("T2 on claude/codex/pi needs a ZAI key: set ZAI_API_KEY (or CLAUDE_T2_KEY), "
+                     "or store one in the omp login (agent.db auth_credentials).")
+        os.environ["CLAUDE_T2_KEY"] = k[0]
     if T2_HARNESS == "omp" and not os.environ.get("ZAI_API_KEY"):
         # consistent online snapshot of the default profile's stored login (live db → use backup API)
         import sqlite3
@@ -158,7 +200,7 @@ def t2() -> None:
         src_db.close()
         check("t2: auth snapshot from default profile (agent.db)", (PROFILE / "agent.db").exists())
     with hvfmt.Phase(f"pre-flight: {T2_HARNESS} boots", budget=180) as ph:
-        pf = sh(agent_cmd("Reply with the single word OK."), timeout=180)
+        pf = sh(agent_cmd("Reply with the single word OK."), env={**os.environ, **agent_env()}, cwd=PROFILE, timeout=180)
         ph.status = "OK" if "OK" in (pf.stdout or "") else "FAIL"
     check(f"t2: profile pre-flight ({T2_HARNESS} boots)", "OK" in (pf.stdout or ""),
           "" if "OK" in (pf.stdout or "") else (pf.stderr or "")[-120:])
@@ -184,7 +226,7 @@ def t2() -> None:
     else:
         with hvfmt.Phase("audit — model reads the corpus and writes report.md", budget=1500,
                          hint=lambda: _file_hint(report, "report.md")) as ph:
-            r = sh(agent_cmd(audit_prompt), timeout=1500)
+            r = sh(agent_cmd(audit_prompt), env={**os.environ, **agent_env()}, cwd=PROFILE, timeout=1500)
             ph.status = "OK" if report.exists() else "FAIL"
         (OUT / "audit-last-output.txt").write_text(
             ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
@@ -212,7 +254,7 @@ def t2() -> None:
         "Do not commit. English.")
     with hvfmt.Phase("apply — model probes, edits files, probes again", budget=3000,
                      hint=lambda: _bak_hint()) as ph:
-        r = sh(agent_cmd(apply_prompt), timeout=3000)
+        r = sh(agent_cmd(apply_prompt), env={**os.environ, **agent_env()}, cwd=PROFILE, timeout=3000)
     (OUT / "apply-last-output.txt").write_text(
         ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
     changed_fx = [p for p, h in fx_files.items() if _h(p) != h]
@@ -354,7 +396,7 @@ def t2x() -> None:
               "apply exactly its rows, nothing else. There are no probe-worthy rules: skip the probes. "
               f"Write the ledger to {o}/ledger.jsonl. Do not commit. English.")
     with hvfmt.Phase("apply — model edits files from the exported decisions", budget=2400, hint=_bak_hint) as ph:
-        r = sh(agent_cmd(prompt), timeout=2400)
+        r = sh(agent_cmd(prompt), env={**os.environ, **agent_env()}, cwd=PROFILE, timeout=2400)
         ph.status = "OK" if r.returncode == 0 else "FAIL"
     (OUT / "apply-t2x-output.txt").write_text(((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
     oracle_from = len(RESULTS)   # the checks below are an independent line-by-line oracle for apply/verify.py
