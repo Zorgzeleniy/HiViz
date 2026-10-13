@@ -79,7 +79,8 @@ def build_argv(template: str, ask: str, cwd: Path | None = None) -> list[str]:
     posix = os.name != "nt"  # keep Windows backslash paths intact
     parts = shlex.split(template, posix=posix)
     if not posix:
-        parts = [x[1:-1] if len(x) >= 2 and x[0] == x[-1] == '"' else x for x in parts]
+        # strip single OR double quotes a caller's shlex.join left around paths
+        parts = [x[1:-1] if len(x) >= 2 and x[0] == x[-1] in ("'", '"') else x for x in parts]
     if not any("{ask}" in x for x in parts):
         parts.append("{ask}")
     here = str(cwd or Path.cwd())
