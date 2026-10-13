@@ -120,6 +120,13 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
             "base_url = \"https://api.z.ai/api/coding/paas/v4\"\n"
             "env_key = \"ZAI_API_KEY\"\nwire_api = \"chat\"\n\n"
             'sandbox_mode = "danger-full-access"\n', encoding="utf-8")
+    if h.name == "codex":   # codex exec sanitizes the env its shell children inherit: the nested
+        # constitution engine would lose ZAI_API_KEY. probe-env restores it (constitution/control.py
+        # reads it, the control copy carries it) — never printed, never committed (gitignored: .hiviz/).
+        k = os.environ.get("CLAUDE_T2_KEY") or os.environ.get("ZAI_API_KEY") or ""
+        if k:
+            (prof / ".hiviz").mkdir(exist_ok=True)
+            (prof / ".hiviz" / "probe-env").write_text(f"ZAI_API_KEY={k}\n", encoding="utf-8")
     (prof / "config.yml").write_text(
         "modelRoles:\n  default: zai/glm-5.3-flash:high\nmemory:\n  backend: local\n"
         "skills:\n  customDirectories:\n    - " + str(prof / "skills").replace("\\", "/") + "\n",

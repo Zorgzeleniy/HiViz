@@ -139,6 +139,10 @@ def build(corpus: Path, dst: Path, needle: str | None, mode: str, canary: str = 
         if mode in ("ablate", "canary") and not held:
             raise Unavailable(f"the guarded phrase appears only in structured files ({', '.join(left)}): a canary line cannot be planted there"
                               if left else "the guarded line was not found in any instruction-like text file under --corpus")
+    probe_env_file = corpus / ".hiviz" / "probe-env"
+    if probe_env_file.exists():   # harnesses that sanitize inherited env (codex) need it in the copy too
+        (dst / ".hiviz").mkdir(exist_ok=True)
+        shutil.copy2(probe_env_file, dst / ".hiviz" / "probe-env")
     _git_init(dst, corpus)
     return held, left
 
@@ -146,7 +150,19 @@ def build(corpus: Path, dst: Path, needle: str | None, mode: str, canary: str = 
 def probe_env(cwd: Path) -> dict:
     env = dict(os.environ)
     env["PWD"] = str(cwd)   # $PWD must point at the copy on every OS: Windows shells (Git Bash, test rigs) set it
-    return env              # too, and an inherited one points the harness at the ORIGINAL project
+    # too, and an inherited one points the harness at the ORIGINAL project.
+    # Some harness CLIs (codex exec) sanitize the env their shell children inherit, so a key the
+    # rig exported never reaches the probe. A .hiviz/probe-env file (KEY=VALUE lines, never printed)
+    # restores what the probe's harness template needs — the rig writes it into the sandbox.
+    f = cwd / ".hiviz" / "probe-env"
+    try:
+        for line in f.read_text(encoding="utf-8").splitlines():
+            k, _, v = line.partition("=")
+            if k.strip() and not v.startswith('"'):
+                env[k.strip()] = v.strip()
+    except OSError:
+        pass
+    return env
 
 
 def with_note(ask: str, on: bool) -> str:
