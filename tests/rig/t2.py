@@ -93,18 +93,29 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         (link.parent / "engines").symlink_to(os.path.relpath(prof / "engines", link.parent), target_is_directory=True)
         for rel, text in h.extras.items():   # e.g. opencode must be told to load RULES.md so the safety probes can quote it
             (prof / rel).write_text(text, encoding="utf-8")
-    if h.name == "pi":   # pi needs its provider registry pointed at ZAI inside the sandbox
+    if h.name == "claude":
+        # claude auto-loads <cwd>/CLAUDE.md into the system prompt, not RULES.md (omp's file), and
+        # the probes answer from standing instructions only (no file reads) — so the safety lines
+        # must BE in the auto-loaded file. Apply never touches safety lines (invariant), so the
+        # mirror never goes stale within a run.
+        (prof / "CLAUDE.md").write_text(
+            (prof / "RULES.md").read_text(encoding="utf-8"), encoding="utf-8")
+    if h.name == "pi":
+        # pi loads ONLY <cwd>/AGENTS.md (CLAUDE.md ignored when AGENTS.md exists) + its global
+        # <PI dir>/AGENTS.md. The safety lines the probes quote live in RULES.md (omp's file) —
+        # mirror them into the sandbox pi dir's global AGENTS.md. Apply never touches safety
+        # lines (invariant), so the mirror never goes stale within a run.
         (prof / ".pi-agent").mkdir(exist_ok=True)
-        (prof / ".pi-agent/models.yml").write_text(
-            "providers:\n  zai:\n    baseUrl: https://api.z.ai/api/coding/paas/v4\n"
-            "    api: openai-completions\n    apiKey: ZAI_API_KEY\n"
-            "    models:\n      - id: glm-5.3-flash\n        name: GLM 5.3 Flash\n"
-            "        contextWindow: 128000\n        maxTokens: 8192\n", encoding="utf-8")
+        (prof / ".pi-agent/AGENTS.md").write_text(
+            (prof / "RULES.md").read_text(encoding="utf-8"), encoding="utf-8")
     if h.name == "codex":   # codex config: ZAI provider on chat wire (0.50 pin — see harness.py);
-        # danger-full-access: apply starts nested headless probes from inside codex's own sandbox
+        # danger-full-access: apply starts nested headless probes from inside codex's own sandbox;
+        # RULES.md as project doc: codex reads AGENTS.md by default, omp's RULES.md (the safety
+        # lines the probes quote) must be named — project_doc_fallback_filenames (0.50 key).
         (prof / ".codex").mkdir(exist_ok=True)
         (prof / ".codex/config.toml").write_text(
-            'model = "glm-5.3-flash"\nmodel_provider = "zai"\n\n'
+            'model = "glm-5.3-flash"\nmodel_provider = "zai"\n'
+            'project_doc_fallback_filenames = ["RULES.md"]\n\n'
             "[model_providers.zai]\nname = \"zai\"\n"
             "base_url = \"https://api.z.ai/api/coding/paas/v4\"\n"
             "env_key = \"ZAI_API_KEY\"\nwire_api = \"chat\"\n\n"
@@ -174,6 +185,11 @@ def t2() -> None:
           else "== T2: E2E on sandbox profile ==")
     OUT.mkdir(parents=True, exist_ok=True)
     o = OUT.as_posix()
+    # HIVIZ_REUSE=1: snapshot a skill-convention report from a previous run BEFORE profile_setup
+    # rebuilds the sandbox (it wipes the profile); tests/out/report.md is read directly.
+    _prev = PROFILE / ".hiviz" / "report.md"
+    if os.environ.get("HIVIZ_REUSE") == "1" and _prev.exists() and not (OUT / "report.md").exists():
+        shutil.copy2(_prev, OUT / "report.md")
     profile_setup()
     if T2_HARNESS in ("claude", "codex", "pi") and not (os.environ.get("ZAI_API_KEY") or os.environ.get("CLAUDE_T2_KEY")):
         # no ZAI key in the env: take the newest one from the omp stored login (the maintainer's machine)
@@ -220,16 +236,21 @@ def t2() -> None:
           f"{o}/decisions.md (DECISION column empty). Do NOT modify any audited file. "
           "Your final chat reply: one summary line only. English.")
     report = OUT / "report.md"
+    skill_report = PROFILE / ".hiviz" / "report.md"   # the skill's own convention; some harnesses
+    # (claude+glm on first run) write there even when told a different absolute path
     reuse = os.environ.get("HIVIZ_REUSE") == "1"
-    if reuse and report.exists() and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
+    if reuse and (report.exists() or skill_report.exists()) \
+            and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
         print("  [skip] reusing existing report.md (HIVIZ_REUSE=1)")
     else:
         with hvfmt.Phase("audit — model reads the corpus and writes report.md", budget=1500,
                          hint=lambda: _file_hint(report, "report.md")) as ph:
             r = sh(agent_cmd(audit_prompt), env={**os.environ, **agent_env()}, cwd=PROFILE, timeout=1500)
-            ph.status = "OK" if report.exists() else "FAIL"
+            ph.status = "OK" if report.exists() or skill_report.exists() else "FAIL"
         (OUT / "audit-last-output.txt").write_text(
             ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
+    if not report.exists() and skill_report.exists():
+        shutil.copy2(skill_report, report)
     check("audit: completed & report written", report.exists(),
           "see tests/out/audit-last-output.txt" if not report.exists() else "")
     if not report.exists():

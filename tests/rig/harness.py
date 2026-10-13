@@ -170,6 +170,15 @@ def _opencode_run(prompt: str, sandbox: Path, model: str) -> list[str]:
 
 
 def _claude_run(prompt: str, sandbox: Path, model: str) -> list[str]:
+    # Windows: `claude` resolves to the npm .cmd wrapper, whose cmd.exe layer EATS newlines in
+    # arguments — multi-line prompts lose everything after the first line. Call the shim exe
+    # next to it instead (same package, native launcher, passes argv through verbatim).
+    exe = shutil.which("claude") or "claude"
+    if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")):
+        cand = Path(exe).parent / "node_modules" / "@anthropic-ai" / "claude-code" / "bin" / "claude.exe"
+        if cand.exists():
+            return [str(cand), "-p", prompt, "--model", model, "--no-session-persistence",
+                    "--permission-mode", "bypassPermissions"]
     return ["claude", "-p", prompt, "--model", model, "--no-session-persistence",
             "--permission-mode", "bypassPermissions"]
 
@@ -186,6 +195,12 @@ def _codex_run(prompt: str, sandbox: Path, model: str) -> list[str]:
 
 
 def _pi_run(prompt: str, sandbox: Path, model: str) -> list[str]:
+    # Windows .cmd wrapper eats newlines in argv (see _claude_run) — drive the js entry with node.
+    exe = shutil.which("pi") or "pi"
+    if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")):
+        cand = Path(exe).parent / "node_modules" / "@mariozechner" / "pi-coding-agent" / "dist" / "cli.js"
+        if cand.exists():
+            return ["node", str(cand), "-p", "--model", model, prompt]
     return ["pi", "-p", "--model", model, prompt]
 
 
