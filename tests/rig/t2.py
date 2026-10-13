@@ -109,9 +109,10 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         (prof / ".pi-agent/AGENTS.md").write_text(
             (prof / "RULES.md").read_text(encoding="utf-8"), encoding="utf-8")
     if h.name == "codex":   # codex config: ZAI provider on chat wire (0.50 pin — see harness.py);
-        # danger-full-access: apply starts nested headless probes from inside codex's own sandbox;
-        # RULES.md as project doc: codex reads AGENTS.md by default, omp's RULES.md (the safety
-        # lines the probes quote) must be named — project_doc_fallback_filenames (0.50 key).
+        # danger-full-access: apply starts nested headless probes from inside codex's own sandbox.
+        # RULES.md safety lines must reach the model: project_doc_fallback_names only fire when
+        # AGENTS.md is ABSENT (the audit corpus has one), so they also live in the codex-global
+        # <CODEX_HOME>/AGENTS.md — the file codex always loads (live-tested: probe quotes both).
         (prof / ".codex").mkdir(exist_ok=True)
         (prof / ".codex/config.toml").write_text(
             'model = "glm-5.3-flash"\nmodel_provider = "zai"\n'
@@ -120,6 +121,8 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
             "base_url = \"https://api.z.ai/api/coding/paas/v4\"\n"
             "env_key = \"ZAI_API_KEY\"\nwire_api = \"chat\"\n\n"
             'sandbox_mode = "danger-full-access"\n', encoding="utf-8")
+        (prof / ".codex" / "AGENTS.md").write_text(
+            (prof / "RULES.md").read_text(encoding="utf-8"), encoding="utf-8")
     if h.name == "codex":   # codex exec sanitizes the env its shell children inherit: the nested
         # constitution engine would lose ZAI_API_KEY. probe-env restores it (constitution/control.py
         # reads it, the control copy carries it) — never printed, never committed (gitignored: .hiviz/).
