@@ -16,10 +16,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver;
   MCP tool names are `<server>_<tool>` (OpenCode's own sanitizer, not `mcp__*`); blame mines the
   `edit` / `write` / `patch` tools with the file path, model and session title from `session_v2`.
 - **T2 (the rig's end-to-end model runs) wired for Claude Code, Codex and pi** — previously only
-  omp and OpenCode. All three ride one ZAI key (bigmodel anthropic/openai facades, auto-exported
-  from the omp login), so no per-harness accounts are needed: `HIVIZ_T2_HARNESS=claude|codex|pi
-  python tests/run.py --t2x`. Codex runs the 0.50.0 line (npm alias `codex-t2`): current releases
-  dropped the chat wire API and bigmodel has no /responses.
+  omp and OpenCode. One key per machine, no per-harness accounts: `DASHSCOPE_API_KEY` (recommended,
+  glm-5.3, no fair-use storms) or the ZAI key auto-exported from the omp login —
+  `HIVIZ_T2_HARNESS=claude|codex|pi python tests/run.py --t2x`. Codex runs the 0.50.0 line (npm alias
+  `codex-t2`): current releases dropped the chat wire API and bigmodel has no /responses. Proven
+  by live runs: pi 12–13/13, claude 12/13 (42/42 report rows, recall 8/8, probes PASS), codex 11/13
+  (residual: the model not following the report format contract, not wiring). Along the way, four
+  integration bugs the runs exposed are fixed: Windows .cmd wrappers eat newlines in argv (adapters
+  call the native binary); codex exec sanitizes inherited env and runs read-only (probe-env file +
+  bypass flag); control probes now point CODEX_HOME/PI_CODING_AGENT_DIR at the ablated copy
+  (an inherited global-instructions dir made PASS verdicts UNPROVEN).
 
 ### Changed
 - npm tarball ships the engines once (inside `plugin/`), not twice — `hiviz init` syncs
