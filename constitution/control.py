@@ -151,6 +151,16 @@ def probe_env(cwd: Path) -> dict:
     env = dict(os.environ)
     env["PWD"] = str(cwd)   # $PWD must point at the copy on every OS: Windows shells (Git Bash, test rigs) set it
     # too, and an inherited one points the harness at the ORIGINAL project.
+    # Config-dir env vars (CODEX_HOME, PI_CODING_AGENT_DIR) have the same hazard: the control
+    # probe must run against the COPY's config (ablated), not the original corpus's — and when
+    # the copy carries the dir, point the var at it.
+    for var in ("CODEX_HOME", "PI_CODING_AGENT_DIR"):
+        val = env.get(var)
+        if val:
+            local = cwd / Path(val).name
+            if (local / "AGENTS.md").exists() or (local / "config.toml").exists() \
+                    or (local / "models.json").exists():
+                env[var] = str(local)
     # Some harness CLIs (codex exec) sanitize the env their shell children inherit, so a key the
     # rig exported never reaches the probe. A .hiviz/probe-env file (KEY=VALUE lines, never printed)
     # restores what the probe's harness template needs — the rig writes it into the sandbox.
