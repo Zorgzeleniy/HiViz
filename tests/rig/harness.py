@@ -195,7 +195,8 @@ def _codex_run(prompt: str, sandbox: Path, model: str) -> list[str]:
     t2 = Path.home() / "AppData/Roaming/npm/node_modules/codex-t2/bin/codex.js" if os.name == "nt" \
         else Path.home() / ".npm-global/lib/node_modules/codex-t2/bin/codex.js"
     if t2.exists():
-        return ["node", str(t2), "exec", "--skip-git-repo-check", "-c", f"model={model}", prompt]
+        return ["node", str(t2), "exec", "--skip-git-repo-check", "-c", f"model={model}",
+                "--dangerously-bypass-approvals-and-sandbox", prompt]
     return ["codex", "exec", "--skip-git-repo-check", "-c", f"model={model}", prompt]
 
 
