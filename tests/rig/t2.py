@@ -20,13 +20,16 @@ PROFILE = HOME / ".omp/profiles/hiviz-test/agent"
 
 T2_HARNESS = os.environ.get("HIVIZ_T2_HARNESS", "omp")  # omp | opencode | claude | codex | pi
 
-# claude/codex/pi ride the maintainer's ZAI key (bigmodel.cn facades): one key, three harnesses,
-# no per-harness accounts. ZAI_API_KEY or CLAUDE_T2_KEY must be set; omp needs none (stored login).
+# claude/codex/pi ride the maintainer's DashScope key (Aliyun, glm-5.3, no fair-use storms) when
+# DASHSCOPE_API_KEY is set; otherwise the ZAI/bigmodel coding-plan key (ZAI_API_KEY / CLAUDE_T2_KEY,
+# auto-exported from the omp login). omp needs none (stored login).
+from .harness import DS_MODEL, DS_KEY, OPENAI_URL   # glm-5.3 on dashscope, glm-5.3-flash on the zai facades
+
 T2_MODEL = os.environ.get("HIVIZ_T2_MODEL") or {
     "opencode": "opencode/big-pickle",   # free, no key
-    "claude": "glm-5.3-flash",
-    "codex": "glm-5.3-flash",
-    "pi": "zai/glm-5.3-flash",
+    "claude": DS_MODEL,
+    "codex": DS_MODEL,
+    "pi": os.environ.get("DASHSCOPE_API_KEY") and f"dashscope/{DS_MODEL}" or f"zai/{DS_MODEL}",
 }.get(T2_HARNESS, "zai/glm-5.3-flash:high")
 
 
@@ -108,6 +111,19 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         (prof / ".pi-agent").mkdir(exist_ok=True)
         (prof / ".pi-agent/AGENTS.md").write_text(
             (prof / "RULES.md").read_text(encoding="utf-8"), encoding="utf-8")
+        # pi reads models.JSON (custom-provider doc) and overrides builtin providers by name:
+        # 'zai' builtin would win with its own endpoint -> our key 401s there. Use a distinct
+        # provider name so the sandbox one is the only zai-family entry.
+        import json as _json
+        (prof / ".pi-agent" / "models.json").write_text(_json.dumps({
+            "providers": {
+                "dashscope": {
+                    "baseUrl": OPENAI_URL,
+                    "api": "openai-completions",
+                    "apiKey": "ZAI_API_KEY",
+                    "models": [{"id": DS_MODEL, "name": "GLM 5.3",
+                                "contextWindow": 128000, "maxTokens": 8192}],
+                }}}), encoding="utf-8")
     if h.name == "codex":   # codex config: ZAI provider on chat wire (0.50 pin — see harness.py);
         # danger-full-access: apply starts nested headless probes from inside codex's own sandbox.
         # RULES.md safety lines must reach the model: project_doc_fallback_names only fire when
@@ -115,18 +131,18 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
         # <CODEX_HOME>/AGENTS.md — the file codex always loads (live-tested: probe quotes both).
         (prof / ".codex").mkdir(exist_ok=True)
         (prof / ".codex/config.toml").write_text(
-            'model = "glm-5.3-flash"\nmodel_provider = "zai"\n'
+            f'model = "{DS_MODEL}"\nmodel_provider = "zai"\n'
             'project_doc_fallback_filenames = ["RULES.md"]\n\n'
             "[model_providers.zai]\nname = \"zai\"\n"
-            "base_url = \"https://api.z.ai/api/coding/paas/v4\"\n"
+            f"base_url = \"{OPENAI_URL}\"\n"
             "env_key = \"ZAI_API_KEY\"\nwire_api = \"chat\"\n\n"
             'sandbox_mode = "danger-full-access"\n', encoding="utf-8")
         (prof / ".codex" / "AGENTS.md").write_text(
             (prof / "RULES.md").read_text(encoding="utf-8"), encoding="utf-8")
-    if h.name == "codex":   # codex exec sanitizes the env its shell children inherit: the nested
-        # constitution engine would lose ZAI_API_KEY. probe-env restores it (constitution/control.py
-        # reads it, the control copy carries it) — never printed, never committed (gitignored: .hiviz/).
-        k = os.environ.get("CLAUDE_T2_KEY") or os.environ.get("ZAI_API_KEY") or ""
+        # codex exec sanitizes the env its shell children inherit: the nested constitution
+        # engine would lose ZAI_API_KEY. probe-env restores it (constitution/control.py reads
+        # it, the control copy carries it) — never printed, never committed (gitignored: .hiviz/).
+        k = DS_KEY()
         if k:
             (prof / ".hiviz").mkdir(exist_ok=True)
             (prof / ".hiviz" / "probe-env").write_text(f"ZAI_API_KEY={k}\n", encoding="utf-8")
@@ -201,7 +217,7 @@ def t2() -> None:
     if os.environ.get("HIVIZ_REUSE") == "1" and _prev.exists() and not (OUT / "report.md").exists():
         shutil.copy2(_prev, OUT / "report.md")
     profile_setup()
-    if T2_HARNESS in ("claude", "codex", "pi") and not (os.environ.get("ZAI_API_KEY") or os.environ.get("CLAUDE_T2_KEY")):
+    if T2_HARNESS in ("claude", "codex", "pi") and not (os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("ZAI_API_KEY") or os.environ.get("CLAUDE_T2_KEY")):
         # no ZAI key in the env: take the newest one from the omp stored login (the maintainer's machine)
         import sqlite3
         try:

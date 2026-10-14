@@ -155,10 +155,15 @@ def _omp(home: Path, cwd: Path, profile: str | None = None) -> set[str]:
 
 
 # ---- model runs
-# All three ride the maintainer's ZAI (bigmodel.cn) subscription key: no per-harness account is needed.
-# CLAUDE_T2_KEY / ZAI_API_KEY name the env var the rig exports from the omp stored login (t2.py).
-ZAI_ANTHROPIC_URL = "https://api.z.ai/api/anthropic"   # anthropic-compatible facade (open.bigmodel.cn resets connections here)
-ZAI_OPENAI_URL = "https://api.z.ai/api/coding/paas/v4"        # openai-compatible facade (omp zai provider route)
+# All three ride the maintainer's DashScope (Aliyun) key when DASHSCOPE_API_KEY is set —
+# glm-5.3 answers there in ~2 s with no fair-use storms; the ZAI/bigmodel coding-plan facades
+# (open.bigmodel.cn resets connections on this network; api.z.ai throttles bursts) are the fallback.
+ANTHROPIC_URL = "https://dashscope.aliyuncs.com/apps/anthropic" if os.environ.get("DASHSCOPE_API_KEY") \
+    else "https://api.z.ai/api/anthropic"   # anthropic-compatible facade
+OPENAI_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1" if os.environ.get("DASHSCOPE_API_KEY") \
+    else "https://api.z.ai/api/coding/paas/v4"   # openai-compatible facade (omp zai provider route)
+DS_KEY = lambda: os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("CLAUDE_T2_KEY") or os.environ.get("ZAI_API_KEY") or ""
+DS_MODEL = "glm-5.3" if os.environ.get("DASHSCOPE_API_KEY") else "glm-5.3-flash"   # dashscope carries glm-5.3 (no -flash)
 
 
 def _omp_run(prompt: str, sandbox: Path, model: str) -> list[str]:
@@ -219,13 +224,13 @@ class Harness:
 
 
 def _zai_key() -> str:
-    return os.environ.get("CLAUDE_T2_KEY") or os.environ.get("ZAI_API_KEY") or ""
+    return DS_KEY()
 
 
 def _claude_env(sandbox: Path, model: str) -> dict[str, str]:
     # No CLAUDE_CONFIG_DIR: the login lives in the real ~/.claude; skills come from <cwd>/.claude/skills
     # (profile_setup symlinks it). Window enforcement off: glm models are not in claude's catalog.
-    return {"ANTHROPIC_BASE_URL": ZAI_ANTHROPIC_URL, "ANTHROPIC_AUTH_TOKEN": _zai_key(), "ANTHROPIC_API_KEY": "",
+    return {"ANTHROPIC_BASE_URL": ANTHROPIC_URL, "ANTHROPIC_AUTH_TOKEN": _zai_key(), "ANTHROPIC_API_KEY": "",
             "ANTHROPIC_MODEL": model, "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT": "1"}
 
 
