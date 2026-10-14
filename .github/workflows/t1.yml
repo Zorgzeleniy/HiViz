@@ -90,4 +90,7 @@ jobs:
       - name: marketplace plugin is current (plugin/ + catalogs rendered from core/, templates/, engines)
         run: node scripts/build-plugin.js --check
       - name: deterministic test rig (T1)
-        run: python tests/run.py --t1
+        run: |
+          set -o pipefail
+          python tests/run.py --t1 2>&1 | tee /tmp/t1.log
+          grep -E "\[FAIL\]" /tmp/t1.log | sed 's/^/::error::/' || true
