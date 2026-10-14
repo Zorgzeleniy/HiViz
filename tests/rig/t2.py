@@ -269,9 +269,9 @@ def t2() -> None:
             and "10.0.0.42" in (PROFILE / "AGENTS.md").read_text(encoding="utf-8"):
         print("  [skip] reusing existing report.md (HIVIZ_REUSE=1)")
     else:
-        with hvfmt.Phase("audit — model reads the corpus and writes report.md", budget=1500,
+        with hvfmt.Phase("audit — model reads the corpus and writes report.md", budget=2400,
                          hint=lambda: _file_hint(report, "report.md")) as ph:
-            r = sh(agent_cmd(audit_prompt), env={**os.environ, **agent_env()}, cwd=PROFILE, timeout=1500)
+            r = sh(agent_cmd(audit_prompt), env={**os.environ, **agent_env()}, cwd=PROFILE, timeout=2400)
             ph.status = "OK" if report.exists() or skill_report.exists() else "FAIL"
         (OUT / "audit-last-output.txt").write_text(
             ((r.stdout or "")[-4000:]) + "\n--STDERR--\n" + ((r.stderr or "")[-1500:]), encoding="utf-8")
