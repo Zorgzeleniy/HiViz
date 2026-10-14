@@ -365,7 +365,7 @@ function status() {
     }, null, 2));
     return;
   }
-  const note = probeReady ? "" : "  ! no probe CLI on PATH — constitution tests (/hv-test) would ERROR; audit/drift/meters/blame work without one";
+  const note = probeReady ? "" : "  ! no probe CLI on PATH - constitution tests (/hv-test) would ERROR; audit/drift/meters/blame work without one";
   if (FMT === "pretty") {
     say("");
     console.log(paint("hiviz status", "bold") + paint("  harnesses on this machine", "gray"));
@@ -435,7 +435,7 @@ function install(dry) {
       "Python engines: ~/.hiviz/engines\n\n" +
       "First step: open your agent in a project and run /hv-audit (or ask it to \"audit my prompt debt\") —\n" +
       "it writes .hiviz/report.md and report.html; you decide, then /hv-apply." +
-      (probeAny ? "" : "\nNote: no probe CLI on PATH — /hv-test (constitution probes) needs one; audit/drift/meters/blame work without."));
+      (probeAny ? "" : "\nNote: no probe CLI on PATH - /hv-test (constitution probes) needs one; audit/drift/meters/blame work without."));
   }
 }
 
