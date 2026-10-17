@@ -253,7 +253,7 @@ def installer_output_checks() -> None:
     check("installer: `status --format json` lists every harness with detected / adapter / plugin",
           len(by) == 7 and by["Claude Code"]["detected"] and by["Codex"]["detected"] and not by["pi"]["detected"]
           and by["Codex"]["adapter"].startswith("missing") and by["pi"]["adapter"] == "n/a", f"{len(by)} harnesses")
-    pe = {**e, "FORCE_COLOR": "1"}
+    pe = {**e, "FORCE_COLOR": "1", "TERM_PROGRAM": "ci-rig"}   # win32 without WT_SESSION/TERM_PROGRAM folds to ASCII glyphs by design — assert the unicode path
     pretty = sh(["node", "bin/hiviz.js", "status", "--format", "pretty"], env=pe)
     dry = sh(["node", "bin/hiviz.js", "init", "--dry", "--format", "pretty"], env=pe)
     plain = sh(["node", "bin/hiviz.js", "status"], env=e)

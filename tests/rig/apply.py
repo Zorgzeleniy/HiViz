@@ -112,7 +112,8 @@ def build(name, new=None, rows=None, *, backup=True, skill_new=None, ledger="ful
 
 def verify(d, *args, fmt="json"):
     r = sh([sys.executable, "apply/verify.py", "--decisions", str(d / "decisions.md"), "--format", fmt, *args],
-           env={k: v for k, v in os.environ.items() if not k.startswith("HIVIZ_") and k != "NO_COLOR"})
+           env={k: v for k, v in os.environ.items() if not k.startswith("HIVIZ_") and k != "NO_COLOR"}
+               | {"PYTHONIOENCODING": "utf-8"})   # the pretty check asserts unicode glyphs: a cp1252 pipe (windows CI) folds them by design
     if fmt != "json":
         return r.returncode, r.stdout
     try:
