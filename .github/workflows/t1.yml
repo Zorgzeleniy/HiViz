@@ -75,9 +75,7 @@ jobs:
     defaults:
       run:
         shell: bash   # windows runners default to pwsh; the T1 step is bash (tee/pipefail/grep)
-    # macOS and Windows have not run this rig in CI yet: they report, but do not block, until one run is green.
-    # Then drop this line.
-    continue-on-error: ${{ matrix.os != 'ubuntu-24.04' }}
+    # macOS and Windows went green on 2026-10-15 (run 38991288192) — they block like ubuntu now.
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
