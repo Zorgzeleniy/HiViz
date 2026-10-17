@@ -95,7 +95,9 @@ jobs:
       - name: deterministic test rig (T1)
         run: |
           set -o pipefail
+          echo "::error::diag python=$(command -v python) ver=$(python --version 2>&1) pwd=$PWD shell=$BASH"
           python tests/run.py --t1 2>&1 | tee t1-run.log
+          echo "::error::diag rc=$? logsize=$(wc -c < t1-run.log 2>/dev/null || echo missing)"
           grep -E "\[FAIL\]" t1-run.log | sed 's/^/::error::/' || true
           tail -10 t1-run.log | sed 's/^/::error::/' || true
       - name: t1 log artifact
