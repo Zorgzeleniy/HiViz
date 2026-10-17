@@ -94,12 +94,13 @@ jobs:
         run: node scripts/build-plugin.js --check
       - name: deterministic test rig (T1)
         run: |
-          set -o pipefail
-          echo "::error::diag python=$(command -v python) ver=$(python --version 2>&1) pwd=$PWD shell=$BASH"
-          python tests/run.py --t1 2>&1 | tee t1-run.log
-          echo "::error::diag rc=$? logsize=$(wc -c < t1-run.log 2>/dev/null || echo missing)"
+          rc=0
+          python tests/run.py --t1 2>&1 | tee t1-run.log || rc=$?
+          echo "::error::diag rc=$rc logsize=$(wc -c < t1-run.log)"
           grep -E "\[FAIL\]" t1-run.log | sed 's/^/::error::/' || true
-          tail -10 t1-run.log | sed 's/^/::error::/' || true
+          tail -12 t1-run.log | sed 's/^/::error::/' || true
+          grep -B2 -A10 "Traceback" t1-run.log | head -30 | sed 's/^/::error::/' || true
+          exit $rc
       - name: t1 log artifact
         if: always()
         uses: actions/upload-artifact@v4
