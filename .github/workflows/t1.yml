@@ -97,7 +97,7 @@ jobs:
           set -o pipefail
           python tests/run.py --t1 2>&1 | tee t1-run.log
           grep -E "\[FAIL\]" t1-run.log | sed 's/^/::error::/' || true
-          grep -A8 "Traceback" t1-run.log | head -40 | sed 's/^/::error::/' || true
+          tail -10 t1-run.log | sed 's/^/::error::/' || true
       - name: t1 log artifact
         if: always()
         uses: actions/upload-artifact@v4
