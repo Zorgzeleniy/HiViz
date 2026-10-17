@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 from .harness import HARNESSES, Harness
-from .core import GT, engine_dirs, HOME, OUT, REPO, RESULTS, _SECTION, browser_export, check, hvfmt, sh
+from .core import GT, can_symlink, engine_dirs, HOME, OUT, REPO, RESULTS, _SECTION, browser_export, check, hvfmt, sh
 
 
 PROFILE = HOME / ".omp/profiles/hiviz-test/agent"
@@ -92,8 +92,13 @@ def profile_setup(profile: Path | None = None, h: Harness | None = None) -> None
     if h.skills_dir:   # harnesses other than omp read skills from a project-local dir
         link = prof / h.skills_dir
         link.parent.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(os.path.relpath(prof / "skills", link.parent), target_is_directory=True)
-        (link.parent / "engines").symlink_to(os.path.relpath(prof / "engines", link.parent), target_is_directory=True)
+        if can_symlink():   # one tree, two views; GitHub Windows runners have no symlink privilege
+            link.symlink_to(os.path.relpath(prof / "skills", link.parent), target_is_directory=True)
+            (link.parent / "engines").symlink_to(os.path.relpath(prof / "engines", link.parent),
+                                                 target_is_directory=True)
+        else:
+            shutil.copytree(prof / "skills", link, dirs_exist_ok=True)
+            shutil.copytree(prof / "engines", link.parent / "engines", dirs_exist_ok=True)
         for rel, text in h.extras.items():   # e.g. opencode must be told to load RULES.md so the safety probes can quote it
             (prof / rel).write_text(text, encoding="utf-8")
     if h.name == "claude":

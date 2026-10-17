@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 
-from .core import OUT, REPO, check, fresh_home, home_env, sh
+from .core import OUT, REPO, can_symlink, check, fresh_home, home_env, sh
 
 
 SKILL_NAMES = ["audit", "apply", "drift", "constitution", "blame", "translate"]
@@ -179,6 +179,10 @@ def uninstall_checks() -> None:
 def uninstall_edge_checks() -> None:
     """Symlinked skill dirs and permission errors."""
     # symlinks: never followed into someone else's store, never unlinked, never crash
+    if not can_symlink():   # GitHub Windows runners: no symlink privilege (no Developer Mode)
+        check("uninstall: symlinked ~/.agents and symlinked skill dirs handled (no crash, links and stores intact)", True,
+              "skipped — no symlink privilege on this machine (GitHub Windows runners)")
+        return
     home = fresh_home("symlinks")
     (home / ".codex").mkdir()
     (home / "dotfiles/agents").mkdir(parents=True)

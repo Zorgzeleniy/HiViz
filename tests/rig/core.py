@@ -89,8 +89,12 @@ HARNESS_ENV = ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR", "XDG_CO
 
 
 def home_env(home: Path, **extra: str) -> dict:
-    """Environment of a fake machine: HOME/USERPROFILE point at `home`, no inherited harness overrides."""
-    env = {k: v for k, v in os.environ.items() if k not in HARNESS_ENV}
+    """Environment of a fake machine: HOME/USERPROFILE point at `home`, no inherited harness overrides.
+    Display prefs (NO_COLOR/FORCE_COLOR) are dropped too: a colorless caller terminal must not
+    change what the engines under test print (output.py's own filter is otherwise dead code —
+    home_env re-copies os.environ)."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in HARNESS_ENV and k not in ("NO_COLOR", "FORCE_COLOR", "HIVIZ_FORMAT")}
     env.update(HOME=str(home), USERPROFILE=str(home), **extra)
     return env
 
@@ -100,6 +104,26 @@ def fresh_home(name: str) -> Path:
     shutil.rmtree(home, ignore_errors=True)
     home.mkdir(parents=True)
     return home
+
+_SYMLINK_OK: bool | None = None
+
+
+def can_symlink() -> bool:
+    """GitHub Windows runners have no symlink privilege (no Developer Mode): creating any
+    symlink raises OSError. Tests that need symlinks skip with a reason instead of crashing."""
+    global _SYMLINK_OK
+    if _SYMLINK_OK is None:
+        t = OUT / ".symlink-probe"
+        t.mkdir(parents=True, exist_ok=True)
+        (t / "target").touch()
+        try:
+            (t / "link").symlink_to(t / "target")
+            _SYMLINK_OK = True
+        except (OSError, NotImplementedError):
+            _SYMLINK_OK = False
+        finally:
+            shutil.rmtree(t, ignore_errors=True)
+    return _SYMLINK_OK
 
 
 def engine_dirs() -> list[str]:
