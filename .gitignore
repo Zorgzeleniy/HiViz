@@ -8,3 +8,4 @@ tests/**/__pycache__/
 tests/results.log
 bench/runs/*/arm-*/
 bench/runs/20260923-104417/
+bench/*.log
