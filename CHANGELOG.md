@@ -3,7 +3,7 @@
 Format: [Keep a Changelog](https://keepachangelog.com/). Versions follow semver; below 1.0 a minor bump may change behavior.
 
 
-## Unreleased
+## 0.9.0 — 2026-10-15
 
 ### Added
 - `hiviz status` shows a **probe CLI** column (`probesReady` in JSON): whether a headless agent CLI is on

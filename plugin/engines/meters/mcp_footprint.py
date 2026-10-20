@@ -45,7 +45,7 @@ except ImportError:
 
 HOME = Path.home()
 INIT_PARAMS = {"protocolVersion": "2025-06-18", "capabilities": {},
-               "clientInfo": {"name": "hiviz-meter", "version": "0.8.0"}}
+               "clientInfo": {"name": "hiviz-meter", "version": "0.9.0"}}
 MAX_PAGES = 20
 
 
